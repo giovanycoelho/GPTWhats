@@ -1,0 +1,52 @@
+{
+  "name": "gpt-whats",
+  "version": "1.0.0",
+  "description": "WhatsApp AI Bot with GPT-5 Mini integration",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently --names \"SERVER,CLIENT\" --prefix-colors \"cyan,magenta\" --restart-tries 3 \"npm run server\" \"npm run client\"",
+    "server": "nodemon src/server.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "node src/server.js",
+    "start:all": "node start.js",
+    "install-all": "npm install && cd client && npm install",
+    "dev:stable": "concurrently --names \"SERVER,CLIENT\" --prefix-colors \"cyan,magenta\" \"npm start\" \"npm run client\""
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^5.1.0",
+    "@whiskeysockets/baileys": "^6.7.8",
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "helmet": "^7.1.0",
+    "link-preview-js": "^3.1.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "node-gtts": "^2.0.2",
+    "openai": "^4.52.7",
+    "qrcode": "^1.5.3",
+    "rate-limiter-flexible": "^4.0.1",
+    "sharp": "^0.32.6",
+    "socket.io": "^4.7.5",
+    "sqlite3": "^5.1.6",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.3"
+  },
+  "keywords": [
+    "whatsapp",
+    "ai",
+    "bot",
+    "gpt-5",
+    "baileys"
+  ],
+  "author": "GPTWhats",
+  "license": "MIT"
+}
