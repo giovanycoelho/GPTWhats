@@ -9,10 +9,13 @@ router.get('/', async (req, res) => {
   try {
     const configs = await configService.getAll();
     
-    // Don't expose sensitive data in response
+    // Don't expose sensitive data in response, but indicate if key exists
     const safeConfigs = { ...configs };
     if (safeConfigs.openai_api_key) {
+      safeConfigs.openai_api_key_exists = true;
       safeConfigs.openai_api_key = safeConfigs.openai_api_key.replace(/.(?=.{4})/g, '*');
+    } else {
+      safeConfigs.openai_api_key_exists = false;
     }
     
     res.json({ success: true, configs: safeConfigs });

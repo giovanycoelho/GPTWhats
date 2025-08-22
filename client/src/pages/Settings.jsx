@@ -7,11 +7,13 @@ import SettingsSection from '../components/Settings/SettingsSection'
 import SettingsInput from '../components/Settings/SettingsInput'
 import SettingsToggle from '../components/Settings/SettingsToggle'
 import SettingsSelect from '../components/Settings/SettingsSelect'
+import PromptModal from '../components/Settings/PromptModal'
 
 const Settings = () => {
   const { state, updateConfig, updateMultipleConfigs } = useApp()
   const [saving, setSaving] = useState(false)
   const [localConfigs, setLocalConfigs] = useState(state.configs)
+  const [promptModalOpen, setPromptModalOpen] = useState(false)
 
   // Reasoning effort options
   const reasoningEffortOptions = [
@@ -37,17 +39,30 @@ const Settings = () => {
     }
   ]
 
-  // Update local state when global state changes
+  // Update local state when global state changes, but preserve non-masked API key
   React.useEffect(() => {
-    setLocalConfigs(state.configs)
+    setLocalConfigs(prev => {
+      const newConfigs = { ...state.configs }
+      
+      // If API key is masked and we have a real value locally, keep the local value
+      if (newConfigs.openai_api_key && newConfigs.openai_api_key.includes('*') && 
+          prev.openai_api_key && !prev.openai_api_key.includes('*')) {
+        newConfigs.openai_api_key = prev.openai_api_key
+      }
+      
+      return newConfigs
+    })
   }, [state.configs])
 
   const handleInputChange = (key, value) => {
     setLocalConfigs(prev => ({ ...prev, [key]: value }))
     
-    // Auto-save for most settings
+    // Auto-save for most settings, but avoid saving masked API keys
     if (key !== 'openai_api_key' && key !== 'system_prompt') {
       updateConfig(key, value)
+    } else if (key === 'openai_api_key' && !value.includes('*')) {
+      // Only update local state if it's not a masked value
+      setLocalConfigs(prev => ({ ...prev, [key]: value }))
     }
   }
 
@@ -118,9 +133,9 @@ const Settings = () => {
                 label="Chave API OpenAI"
                 value={localConfigs.openai_api_key}
                 onChange={(value) => handleInputChange('openai_api_key', value)}
-                placeholder="sk-..."
+                placeholder={state.configs.openai_api_key_exists ? "Chave já configurada" : "sk-..."}
                 type="password"
-                hint="Sua chave API da OpenAI. Usaremos o modelo GPT-5 Mini."
+                hint={`Sua chave API da OpenAI. Usaremos o modelo GPT-5 Mini. ${state.configs.openai_api_key_exists ? '(Já configurada)' : ''}`}
                 onSave={() => handleSaveSingle('openai_api_key')}
               />
               
@@ -157,8 +172,9 @@ const Settings = () => {
                 placeholder="Você é um assistente útil..."
                 type="textarea"
                 rows={4}
-                hint="Define a personalidade e comportamento da IA"
+                hint="Define a personalidade e comportamento da IA (máximo 50.000 caracteres)"
                 onSave={() => handleSaveSingle('system_prompt')}
+                onExpand={() => setPromptModalOpen(true)}
               />
               
               <SettingsInput
@@ -346,6 +362,16 @@ const Settings = () => {
           <span>{saving ? 'Salvando Configurações...' : 'Salvar Todas as Configurações'}</span>
         </button>
       </motion.div>
+
+      {/* Prompt Modal */}
+      <PromptModal
+        isOpen={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        value={localConfigs.system_prompt}
+        onChange={(value) => handleInputChange('system_prompt', value)}
+        onSave={() => handleSaveSingle('system_prompt')}
+        title="Editar Prompt do Sistema"
+      />
     </div>
   )
 }

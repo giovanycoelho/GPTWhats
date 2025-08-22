@@ -54,6 +54,9 @@ class AIService {
       // Add contact name to message data
       if (contactName) {
         messageData.contactName = contactName;
+        console.log('✅ Contact name added to messageData:', contactName);
+      } else {
+        console.log('⚠️ No contact name provided for:', phone);
       }
       
       // Queue message for delayed processing
@@ -90,11 +93,22 @@ class AIService {
     try {
       console.log(`Processing ${messages.length} queued messages for ${phone}`);
       
+      // Filter out unsupported messages
+      const supportedMessages = messages.filter(msg => 
+        msg.type !== 'unsupported' && 
+        msg.text !== '[Tipo de mensagem não suportado]'
+      );
+      
+      if (supportedMessages.length === 0) {
+        console.log('No supported messages to process, skipping');
+        return;
+      }
+      
       // Get conversation context
       const conversation = await conversationService.getConversation(phone);
       
       // Prepare messages for AI with phone context
-      const contextMessages = await this.prepareContextMessages(conversation, messages, phone);
+      const contextMessages = await this.prepareContextMessages(conversation, supportedMessages, phone);
       
       // Generate response
       const response = await this.generateResponse(contextMessages);
@@ -103,7 +117,7 @@ class AIService {
       
       if (response) {
         // Save conversation - mark user messages correctly
-        const userMessages = messages.map(msg => ({
+        const userMessages = supportedMessages.map(msg => ({
           ...msg,
           role: 'user',
           content: msg.text || msg.content || '[Mensagem não identificada]',
@@ -119,8 +133,13 @@ class AIService {
 
         // Send response
         console.log('Sending humanized response to', phone);
-        await this.sendHumanizedResponse(phone, response, messages);
+        await this.sendHumanizedResponse(phone, response, supportedMessages);
         console.log('Response sent successfully');
+
+        // Process external notifications asynchronously (non-blocking)
+        const externalNotificationsService = (await import('./externalNotificationsService.js')).default;
+        const firstMessageContactName = supportedMessages.length > 0 ? supportedMessages[0].contactName : null;
+        await externalNotificationsService.processNotificationsAsync(response, conversation, phone, firstMessageContactName);
       } else {
         console.error('No response generated, skipping message sending');
       }
@@ -139,8 +158,9 @@ class AIService {
     if (useClientName) {
       // Try to get name from latest message first
       for (const msg of newMessages) {
-        if (msg.contactName) {
-          clientName = msg.contactName;
+        if (msg.contactName && msg.contactName.trim() && !msg.contactName.includes('+')) {
+          clientName = msg.contactName.trim();
+          console.log('📝 Using contact name from message:', clientName);
           break;
         }
       }
@@ -150,20 +170,32 @@ class AIService {
         try {
           const contactsService = (await import('./contactsService.js')).default;
           const contact = await contactsService.getContact(phone);
-          if (contact && contact.name && !contact.name.includes('+')) {
-            clientName = contact.name;
+          if (contact && contact.name && contact.name.trim() && !contact.name.includes('+')) {
+            clientName = contact.name.trim();
+            console.log('📝 Using contact name from database:', clientName);
           }
         } catch (error) {
           console.log('Could not get contact name:', error.message);
         }
+      }
+      
+      if (clientName) {
+        console.log('✅ Client name found:', clientName, 'for phone:', phone);
+      } else {
+        console.log('⚠️ No client name found for phone:', phone);
       }
     }
     
     let systemContent = `${systemPrompt}\n\nIMPORTANTE: Mantenha suas respostas em no máximo ${maxLength} caracteres. Seja conciso, natural e humano.`;
     
     if (clientName && useClientName) {
-      systemContent += `\n\nO nome do cliente é: ${clientName}. Use o nome dele de forma natural nas respostas quando apropriado, mas não em todas as mensagens. Seja sutil e natural.`;
+      systemContent += `\n\nO nome do CLIENTE que está conversando com você é: ${clientName}. Você deve responder PARA o cliente ${clientName}, não se identificar como ele. Use o nome dele de forma natural nas respostas quando apropriado, mas não em todas as mensagens. Seja sutil e natural.`;
     }
+    
+    systemContent += `\n\nCONTEXTO IMPORTANTE: Nas mensagens de histórico a seguir:
+- Mensagens com role "user" = São mensagens QUE VOCÊ RECEBEU do cliente
+- Mensagens com role "assistant" = São respostas QUE VOCÊ ENVIOU para o cliente
+- Você nunca deve se confundir sobre quem é quem na conversa`;
     
     const messages = [
       {
@@ -179,9 +211,18 @@ class AIService {
         if (msg && msg.content && typeof msg.content === 'string' && msg.content.trim()) {
           // Ensure role is correctly identified
           let role = msg.role;
+          
+          // Validate and fix role
           if (!role || (role !== 'user' && role !== 'assistant')) {
-            role = 'user'; // Default to user if role is unclear
+            // Default to user for incoming messages, but log the issue
+            role = 'user';
+            console.log('⚠️ Message with unclear role detected, defaulting to user:', {
+              originalRole: msg.role,
+              content: msg.content.substring(0, 50) + '...'
+            });
           }
+          
+          console.log(`📝 Adding ${role} message:`, msg.content.substring(0, 50) + '...');
           
           messages.push({
             role: role,
@@ -202,8 +243,14 @@ class AIService {
       }
     }
 
-    console.log('Prepared', messages.length, 'messages for GPT-5 Mini');
-    console.log('Message roles sequence:', messages.map(m => ({ role: m.role, preview: m.content?.substring(0, 50) })));
+    console.log('✅ Prepared', messages.length, 'messages for GPT-5 Mini');
+    console.log('📋 Message roles sequence:', messages.map(m => ({ role: m.role, preview: m.content?.substring(0, 50) })));
+    
+    // Final validation
+    const userMessages = messages.filter(m => m.role === 'user').length;
+    const assistantMessages = messages.filter(m => m.role === 'assistant').length;
+    console.log(`📊 Context: ${userMessages} user messages, ${assistantMessages} assistant messages`);
+    
     return messages;
   }
 
@@ -530,7 +577,8 @@ class AIService {
   async sendContactInfoAsText(phone, originalResponse, links, phones, wasAudioResponse) {
     try {
       const whatsappService = (await import('./whatsappService.js')).default;
-      const contactCardEnabled = await configService.get('contact_card_enabled') === 'true';
+      const contactCardConfig = await configService.get('contact_card_enabled');
+      const contactCardEnabled = contactCardConfig === 'true';
       
       // Extract contact info that was filtered from audio
       if (wasAudioResponse) {
@@ -604,15 +652,12 @@ class AIService {
       
       const finalFormattedPhone = formattedPhone.startsWith('+') ? formattedPhone : `+${formattedPhone}`;
       
+      const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:Contato\nTEL;type=CELL;waid=${formattedPhone}:${finalFormattedPhone}\nEND:VCARD`;
+      
       await whatsappService.sendMessage(phone, {
         contacts: [{
-          displayName: 'Vendedor',
-          vcard: `BEGIN:VCARD
-VERSION:3.0
-FN:Vendedor
-ORG:Premix Concreto
-TEL;type=CELL;waid=${formattedPhone}:${finalFormattedPhone}
-END:VCARD`
+          displayName: 'Contato',
+          vcard: vcard
         }]
       });
     } catch (error) {
@@ -690,6 +735,38 @@ END:VCARD`
   clearMemory(phone) {
     if (this.conversationMemory.has(phone)) {
       this.conversationMemory.delete(phone);
+    }
+  }
+
+  async evaluateCondition(prompt) {
+    try {
+      if (!this.openai) {
+        console.log('OpenAI not initialized for condition evaluation');
+        return false;
+      }
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-5-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um avaliador preciso. Responda apenas "SIM" ou "NÃO" baseado na análise solicitada.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_completion_tokens: 10,
+        temperature: 0.1
+      });
+
+      const result = response.choices[0]?.message?.content?.trim() || '';
+      console.log('🎯 Condition evaluation result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error evaluating condition:', error);
+      return false;
     }
   }
 }

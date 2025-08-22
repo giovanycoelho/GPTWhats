@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Save, Eye, EyeOff } from 'lucide-react'
+import { Save, Eye, EyeOff, Maximize2 } from 'lucide-react'
 
 const SettingsInput = ({ 
   label, 
@@ -12,7 +12,8 @@ const SettingsInput = ({
   min,
   max,
   step,
-  onSave
+  onSave,
+  onExpand
 }) => {
   const [showPassword, setShowPassword] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -35,13 +36,24 @@ const SettingsInput = ({
       
       <div className="relative">
         {type === 'textarea' ? (
-          <textarea
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            rows={rows || 3}
-            className="input-glass w-full resize-none"
-          />
+          <div className="relative">
+            <textarea
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              rows={rows || 3}
+              className="input-glass w-full resize-none pr-10"
+            />
+            {onExpand && (
+              <button
+                onClick={onExpand}
+                className="absolute right-2 top-2 p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                title="Expandir para edição completa"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         ) : (
           <input
             type={inputType}

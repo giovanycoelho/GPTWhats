@@ -3,6 +3,7 @@ export function extractLinksAndPhones(text) {
   const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
   
   // More specific phone regex that looks for standalone phone numbers
+  // Detects: +5547991654220, (47) 99165-4220, 47 99165-4220, etc.
   const phoneRegex = /(?:^|\s|:)\s*(\+?(?:55\s?)?[\(\s]*(?:\d{2})\s*[\)\s]*\s*\d{4,5}[\s\-]?\d{4})(?:\s|$)/gi;
 
   const links = [];
@@ -28,22 +29,19 @@ export function extractLinksAndPhones(text) {
     });
   }
 
-  // Extract phone numbers only if they appear to be standalone contact info
-  // Don't extract if the text suggests it's already being presented as contact info
-  const hasContactKeywords = /(?:contato|telefone|fone|número|whatsapp|wa\.me)/i.test(text);
+  // Extract phone numbers for contact card functionality
+  const phoneMatches = text.match(phoneRegex);
   
-  if (!hasContactKeywords) {
-    const phoneMatches = text.match(phoneRegex);
-    if (phoneMatches) {
-      phoneMatches.forEach(match => {
-        const phone = match.trim().replace(/^[:,\s]+|[:,\s]+$/g, ''); // Clean leading/trailing punctuation
-        const cleanPhone = phone.replace(/\D/g, '');
-        if (cleanPhone.length >= 10 && cleanPhone.length <= 15) {
-          phones.push(phone);
-          cleanText = cleanText.replace(match, '').trim();
-        }
-      });
-    }
+  if (phoneMatches) {
+    phoneMatches.forEach(match => {
+      const phone = match.trim().replace(/^[:,\s]+|[:,\s]+$/g, ''); // Clean leading/trailing punctuation
+      const cleanPhone = phone.replace(/\D/g, '');
+      
+      if (cleanPhone.length >= 10 && cleanPhone.length <= 15) {
+        phones.push(phone);
+        cleanText = cleanText.replace(match, '').trim();
+      }
+    });
   }
 
   // Clean up extra whitespace

@@ -15,6 +15,7 @@ import configRoutes from './controllers/configController.js';
 import contactRoutes from './controllers/contactController.js';
 import dashboardRoutes from './controllers/dashboardController.js';
 import audioRoutes from './controllers/audioController.js';
+import externalNotificationsRoutes from './routes/externalNotificationsRoutes.js';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3002"],
     methods: ["GET", "POST"]
   }
 });
@@ -33,7 +34,7 @@ const io = new Server(server, {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3002"],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -52,6 +53,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audio', audioRoutes);
+app.use('/api/external-notifications', externalNotificationsRoutes);
 
 // Socket.IO connection
 io.on('connection', (socket) => {

@@ -7,7 +7,8 @@ import {
   Settings, 
   Bot,
   Activity,
-  Volume2
+  Volume2,
+  Bell
 } from 'lucide-react'
 import { useSocket } from '../../contexts/SocketContext'
 import clsx from 'clsx'
@@ -37,6 +38,11 @@ const Sidebar = () => {
       name: 'Respostas em Áudio',
       path: '/audio-responses',
       icon: Volume2
+    },
+    {
+      name: 'Notificações Externas',
+      path: '/external-notifications',
+      icon: Bell
     },
     {
       name: 'Configurações',

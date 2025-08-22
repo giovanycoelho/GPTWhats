@@ -9,6 +9,7 @@ import WhatsApp from './pages/WhatsApp'
 import Settings from './pages/Settings'
 import Contacts from './pages/Contacts'
 import AudioResponses from './pages/AudioResponses'
+import ExternalNotifications from './pages/ExternalNotifications'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/contacts" element={<Contacts />} />
                 <Route path="/audio-responses" element={<AudioResponses />} />
+                <Route path="/external-notifications" element={<ExternalNotifications />} />
               </Routes>
             </Layout>
             <Toaster 

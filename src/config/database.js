@@ -118,6 +118,42 @@ export const initializeDatabase = async () => {
       process_at DATETIME NOT NULL,
       processed BOOLEAN DEFAULT FALSE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // External notifications settings
+    `CREATE TABLE IF NOT EXISTS external_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      enabled BOOLEAN DEFAULT FALSE,
+      whatsapp_links_enabled BOOLEAN DEFAULT FALSE,
+      custom_rules_enabled BOOLEAN DEFAULT FALSE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // Custom notification rules
+    `CREATE TABLE IF NOT EXISTS notification_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      trigger_prompt TEXT NOT NULL,
+      target_phone TEXT NOT NULL,
+      enabled BOOLEAN DEFAULT TRUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // Notification logs
+    `CREATE TABLE IF NOT EXISTS notification_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL, -- 'whatsapp_link' or 'custom_rule'
+      source_phone TEXT NOT NULL,
+      target_phone TEXT NOT NULL,
+      rule_id INTEGER,
+      content TEXT,
+      sent BOOLEAN DEFAULT FALSE,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (rule_id) REFERENCES notification_rules (id)
     )`
   ];
 
@@ -152,6 +188,16 @@ export const initializeDatabase = async () => {
     } catch (error) {
       console.error('Error inserting default config:', error);
     }
+  }
+
+  // Initialize external notifications settings
+  try {
+    await db.run(
+      `INSERT OR IGNORE INTO external_notifications (id, enabled, whatsapp_links_enabled, custom_rules_enabled) 
+       VALUES (1, FALSE, FALSE, FALSE)`
+    );
+  } catch (error) {
+    console.error('Error initializing external notifications:', error);
   }
 
   console.log('✅ Database initialized successfully');

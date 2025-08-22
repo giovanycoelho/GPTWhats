@@ -206,7 +206,8 @@ async function handleIncomingMessage(message) {
     }
     
     // Update contact info and get contact name
-    const contactName = message.pushName || null;
+    const contactName = message.pushName || message.pushname || message.notify || null;
+    console.log('📱 Contact name detected:', contactName, 'for phone:', phone);
     await updateContactInfo(phone, message);
     
     // Prepare message data for AI processing
@@ -228,12 +229,19 @@ async function updateContactInfo(phone, message) {
     }
     
     const { default: contactsService } = await import('../services/contactsService.js');
-    const pushName = message.pushName || formatPhoneNumber(phone);
+    const pushName = message.pushName || message.pushname || message.notify || formatPhoneNumber(phone);
     
-    await contactsService.updateContact(phone, {
-      name: pushName,
+    // Only update name if it's a valid name (not a phone number)
+    const updateData = {
       lastMessageAt: new Date().toISOString()
-    });
+    };
+    
+    if (pushName && !pushName.includes('+') && pushName !== formatPhoneNumber(phone)) {
+      updateData.name = pushName.trim();
+      console.log('💾 Saving contact name:', pushName.trim(), 'for phone:', phone);
+    }
+    
+    await contactsService.updateContact(phone, updateData);
   } catch (error) {
     console.error('Error updating contact info:', error);
   }
@@ -249,6 +257,14 @@ async function prepareMessageData(message) {
     messageData.text = message.message.conversation;
   } else if (message.message.extendedTextMessage) {
     messageData.text = message.message.extendedTextMessage.text;
+  } else if (message.message.ephemeralMessage && message.message.ephemeralMessage.message) {
+    // Handle ephemeral messages by extracting their inner content
+    const innerMessage = message.message.ephemeralMessage.message;
+    if (innerMessage.conversation) {
+      messageData.text = innerMessage.conversation;
+    } else if (innerMessage.extendedTextMessage) {
+      messageData.text = innerMessage.extendedTextMessage.text;
+    }
   } else if (message.message.audioMessage) {
     // Download and process audio
     try {
@@ -279,7 +295,20 @@ async function prepareMessageData(message) {
     };
     messageData.type = 'document';
     messageData.text = `Documento enviado: ${messageData.document.fileName}`;
+  } else if (message.message.videoMessage) {
+    messageData.type = 'video';
+    messageData.text = 'Vídeo recebido';
+  } else if (message.message.stickerMessage) {
+    messageData.type = 'sticker';
+    messageData.text = 'Figurinha recebida';
+  } else if (message.message.locationMessage) {
+    messageData.type = 'location';
+    messageData.text = 'Localização compartilhada';
+  } else if (message.message.contactMessage) {
+    messageData.type = 'contact';
+    messageData.text = `Contato compartilhado: ${message.message.contactMessage.displayName}`;
   } else {
+    console.log('🚫 Unsupported message type:', Object.keys(message.message));
     messageData.text = '[Tipo de mensagem não suportado]';
     messageData.type = 'unsupported';
   }
