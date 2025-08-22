@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,6 +16,7 @@ import configRoutes from './controllers/configController.js';
 import contactRoutes from './controllers/contactController.js';
 import dashboardRoutes from './controllers/dashboardController.js';
 import audioRoutes from './controllers/audioController.js';
+import pendingMessagesRoutes from './controllers/pendingMessagesController.js';
 import externalNotificationsRoutes from './routes/externalNotificationsRoutes.js';
 
 dotenv.config();
@@ -26,7 +28,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3002"],
+    origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173"],
     methods: ["GET", "POST"]
   }
 });
@@ -34,7 +36,7 @@ const io = new Server(server, {
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3002"],
+  origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173"],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -44,16 +46,57 @@ app.use(rateLimiterMiddleware);
 // Initialize database
 await initializeDatabase();
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Routes
+// Routes - MUST be defined BEFORE static file middleware
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audio', audioRoutes);
+app.use('/api/pending', pendingMessagesRoutes);
 app.use('/api/external-notifications', externalNotificationsRoutes);
+
+// Static files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Always serve built React app for Electron
+const clientBuildPath = path.join(__dirname, '../client/dist');
+const hasBuiltFiles = fs.existsSync(clientBuildPath);
+
+if (hasBuiltFiles) {
+  console.log('📦 Serving built React app from:', clientBuildPath);
+  app.use(express.static(clientBuildPath));
+  
+  // Handle React Router - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+} else {
+  console.log('⚠️ No built files found. Run: cd client && npm run build');
+  console.log('📂 Serving development files from:', path.join(__dirname, '../client'));
+  
+  // Development mode - serve client files
+  const clientPath = path.join(__dirname, '../client');
+  app.use(express.static(clientPath, {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.jsx') || path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
+    }
+  }));
+  
+  // Serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    res.sendFile(path.join(clientPath, 'index.html'));
+  });
+}
 
 // Socket.IO connection
 io.on('connection', (socket) => {

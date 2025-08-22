@@ -140,3 +140,24 @@ ffmpeg.exe
 # Cache
 .cache/
 cache/
+
+# Electron build outputs
+dist/
+app/
+out/
+
+# Electron app data
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.snap
+*.appimage
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx

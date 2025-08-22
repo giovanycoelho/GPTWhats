@@ -3,6 +3,7 @@ import qrcode from 'qrcode';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import pendingMessagesService from './pendingMessagesService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -168,6 +169,10 @@ class WhatsAppService {
 
       // Set initial offline status
       await this.setOfflineStatus();
+
+      // Initialize and process pending messages
+      await pendingMessagesService.initializeService();
+      await pendingMessagesService.onWhatsAppConnected();
     } else if (connection === 'connecting') {
       console.log('🔄 Connecting to WhatsApp...');
       this.connectionState = 'connecting';

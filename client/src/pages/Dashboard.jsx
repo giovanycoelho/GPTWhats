@@ -1,18 +1,26 @@
-import React, { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import React, { useEffect, useState, Suspense, lazy } from 'react'
 import { 
   MessageSquare, 
   Users, 
   Clock, 
-  TrendingUp,
   RefreshCw,
   Activity
 } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
 import { useSocket } from '../contexts/SocketContext'
-import StatsCard from '../components/Dashboard/StatsCard'
-import ActivityChart from '../components/Dashboard/ActivityChart'
-import RecentContacts from '../components/Dashboard/RecentContacts'
+import useLazyLoad from '../hooks/useLazyLoad'
+
+// Lazy load heavy components
+const StatsCard = lazy(() => import('../components/Dashboard/StatsCard'))
+const ActivityChart = lazy(() => import('../components/Dashboard/ActivityChart'))
+const RecentContacts = lazy(() => import('../components/Dashboard/RecentContacts'))
+
+// Lightweight loading component
+const ComponentLoader = () => (
+  <div className="card-glass animate-pulse">
+    <div className="h-24 bg-gray-700 rounded"></div>
+  </div>
+)
 
 const Dashboard = () => {
   const { state, loadDashboard } = useApp()
@@ -41,32 +49,32 @@ const Dashboard = () => {
       value: overview?.messages?.totalSent || 0,
       change: `+${overview?.messages?.today?.sent || 0} hoje`,
       icon: MessageSquare,
-      color: 'text-primary-500',
-      bgColor: 'bg-primary-500/10'
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/10'
     },
     {
       title: 'Conversas Ativas',
       value: overview?.conversations?.totalConversations || 0,
       change: `${overview?.conversations?.activeToday || 0} hoje`,
       icon: Users,
-      color: 'text-success-500',
-      bgColor: 'bg-success-500/10'
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/10'
     },
     {
       title: 'Tempo Online',
       value: formatOnlineTime(overview?.messages?.totalOnlineTime || 0),
       change: `${formatOnlineTime(overview?.messages?.today?.onlineTime || 0)} hoje`,
       icon: Clock,
-      color: 'text-warning-500',
-      bgColor: 'bg-warning-500/10'
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10'
     },
     {
       title: 'Contatos',
       value: overview?.contacts?.totalContacts || 0,
       change: `+${overview?.contacts?.activeToday || 0} ativos`,
       icon: Activity,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10'
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/10'
     }
   ]
 
@@ -93,57 +101,49 @@ const Dashboard = () => {
 
       {/* Status Banner */}
       {whatsappStatus !== 'connected' && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card-glass bg-warning-500/10 border-warning-500/30"
-        >
+        <div className="card-glass bg-amber-500/10 border-amber-500/30 animate-fade-in">
           <div className="flex items-center space-x-3">
-            <div className="w-3 h-3 bg-warning-500 rounded-full animate-pulse" />
+            <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
             <div>
-              <p className="text-warning-400 font-medium">WhatsApp não conectado</p>
+              <p className="text-amber-400 font-medium">WhatsApp não conectado</p>
               <p className="text-sm text-gray-400">
                 Acesse a página do WhatsApp para conectar seu dispositivo
               </p>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsData.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <StatsCard {...stat} />
-          </motion.div>
+        {statsData.map((stat) => (
+          <Suspense key={stat.title} fallback={<ComponentLoader />}>
+            <div className="animate-fade-in">
+              <StatsCard {...stat} />
+            </div>
+          </Suspense>
         ))}
       </div>
 
       {/* Charts and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Activity Chart */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-          className="lg:col-span-2"
-        >
-          <ActivityChart />
-        </motion.div>
+        <div className="lg:col-span-2">
+          <Suspense fallback={<ComponentLoader />}>
+            <div className="animate-fade-in">
+              <ActivityChart />
+            </div>
+          </Suspense>
+        </div>
 
         {/* Recent Contacts */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <RecentContacts />
-        </motion.div>
+        <div>
+          <Suspense fallback={<ComponentLoader />}>
+            <div className="animate-fade-in">
+              <RecentContacts />
+            </div>
+          </Suspense>
+        </div>
       </div>
 
       {/* Loading State */}

@@ -1,10 +1,24 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSocket } from '../../contexts/SocketContext'
-import { Bell, RefreshCw } from 'lucide-react'
+import { Bell, RefreshCw, Download } from 'lucide-react'
 import clsx from 'clsx'
 
 const Header = () => {
   const { connected, whatsappStatus } = useSocket()
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+
+  // Check if running in Electron
+  const isElectron = window.electronAPI?.isElectron || false
+
+  useEffect(() => {
+    if (isElectron && window.electronAPI) {
+      // Get app version
+      window.electronAPI.getVersion().then(version => {
+        setAppVersion(version)
+      })
+    }
+  }, [])
 
   const getStatusText = () => {
     if (!connected) return 'Desconectado do servidor'
@@ -39,6 +53,12 @@ const Header = () => {
     }
   }
 
+  const handleCheckUpdates = () => {
+    if (isElectron && window.electronAPI) {
+      window.electronAPI.checkForUpdates()
+    }
+  }
+
   return (
     <header className="h-16 glass-dark border-b border-white/10 px-6 flex items-center justify-between">
       {/* Status */}
@@ -55,10 +75,28 @@ const Header = () => {
         <span className={clsx('text-sm font-medium', getStatusColor())}>
           {getStatusText()}
         </span>
+        
+        {/* Version info for Electron */}
+        {isElectron && appVersion && (
+          <span className="text-xs text-gray-500 ml-2">
+            v{appVersion}
+          </span>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center space-x-4">
+        {/* Update checker for Electron */}
+        {isElectron && (
+          <button
+            onClick={handleCheckUpdates}
+            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            title="Verificar atualizações"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Refresh button */}
         <button
           onClick={() => window.location.reload()}

@@ -3,7 +3,31 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['framer-motion', 'react-hot-toast'],
+          charts: ['recharts'],
+          icons: ['lucide-react'],
+          socket: ['socket.io-client'],
+          utils: ['axios', 'clsx']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 300,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
+  },
   server: {
+    host: '0.0.0.0',
     port: 3002,
     strictPort: false,
     proxy: {

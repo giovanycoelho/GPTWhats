@@ -4,6 +4,7 @@ import aiService from '../services/aiService.js';
 import conversationService from '../services/conversationService.js';
 import audioService from '../services/audioService.js';
 import configService from '../services/configService.js';
+import messageTrackingService from '../services/messageTrackingService.js';
 import { formatPhoneNumber } from '../utils/textUtils.js';
 
 const router = express.Router();
@@ -198,6 +199,7 @@ async function handleIncomingMessage(message) {
     const phone = message.key.remoteJid;
     const isGroup = phone.endsWith('@g.us');
     const isStatus = phone === 'status@broadcast';
+    const isFromMe = message.key.fromMe;
     
     // Skip group messages and status updates
     if (isGroup || isStatus) {
@@ -205,16 +207,31 @@ async function handleIncomingMessage(message) {
       return;
     }
     
+    // Handle outgoing messages (from us) - track manual responses
+    if (isFromMe) {
+      await messageTrackingService.detectManualResponse(phone, message.key.id);
+      return;
+    }
+    
+    // Track incoming message
+    const messageData = await prepareMessageData(message);
+    const messageId = message.key.id;
+    const timestamp = message.messageTimestamp * 1000 || Date.now();
+    
+    await messageTrackingService.trackIncomingMessage(
+      phone, 
+      messageId, 
+      messageData.text || messageData.type || 'media', 
+      timestamp
+    );
+    
     // Update contact info and get contact name
     const contactName = message.pushName || message.pushname || message.notify || null;
     console.log('📱 Contact name detected:', contactName, 'for phone:', phone);
     await updateContactInfo(phone, message);
     
-    // Prepare message data for AI processing
-    const messageData = await prepareMessageData(message);
-    
-    // Process with AI, passing contact name
-    await aiService.processMessage(phone, messageData, contactName);
+    // Process with AI, passing contact name and message ID for tracking
+    await aiService.processMessage(phone, messageData, contactName, messageId);
     
   } catch (error) {
     console.error('Error handling incoming message:', error);

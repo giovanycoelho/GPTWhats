@@ -13,49 +13,65 @@
 }
 
 @layer components {
-  /* Glass morphism components */
+  /* Optimized Glass morphism components */
   .glass {
-    @apply bg-white/10 backdrop-blur-md border border-white/20;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(12px);
   }
   
   .glass-dark {
-    @apply bg-black/20 backdrop-blur-md border border-white/10;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(12px);
   }
   
-  /* Button styles */
+  /* Lightweight button styles */
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .btn-success {
-    @apply bg-success-500 hover:bg-success-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .btn-warning {
-    @apply bg-warning-500 hover:bg-warning-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .btn-error {
-    @apply bg-error-500 hover:bg-error-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
   .btn-glass {
-    @apply glass hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    @apply text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 hover:bg-white/20;
   }
   
-  /* Input styles */
+  /* Optimized input styles */
   .input-glass {
-    @apply glass placeholder-gray-400 text-white py-2 px-3 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all duration-200;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    @apply placeholder-gray-400 text-white py-2 px-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200;
   }
   
-  /* Card styles */
+  /* Optimized card styles */
   .card-glass {
-    @apply glass rounded-xl p-6 shadow-xl;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    @apply rounded-xl p-6 shadow-xl;
   }
   
-  /* Status indicators */
+  /* Performance-optimized status indicators */
   .status-online {
-    @apply bg-success-500 animate-pulse;
+    @apply bg-green-500;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
   
   .status-offline {
@@ -63,11 +79,13 @@
   }
   
   .status-connecting {
-    @apply bg-warning-500 animate-pulse;
+    @apply bg-amber-500;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
   
   .status-error {
-    @apply bg-error-500 animate-pulse;
+    @apply bg-red-500;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
 
@@ -95,25 +113,24 @@
     background-color: rgba(255, 255, 255, 0.3);
   }
   
-  /* Custom animations */
-  @keyframes typing {
-    0%, 60%, 100% {
-      transform: translateY(0);
+  /* Lightweight animations */
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse,
+    .animate-spin,
+    .animate-fade-in,
+    .animate-slide-up,
+    .animate-pulse-slow {
+      animation: none;
     }
-    30% {
-      transform: translateY(-10px);
-    }
-  }
-  
-  .animate-typing {
-    animation: typing 1.4s ease-in-out infinite;
-  }
-  
-  .animate-typing:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  
-  .animate-typing:nth-child(3) {
-    animation-delay: 0.4s;
   }
 }

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import configService from './configService.js';
 import conversationService from './conversationService.js';
 import audioService from './audioService.js';
+import messageTrackingService from './messageTrackingService.js';
 import { extractLinksAndPhones } from '../utils/textUtils.js';
 
 class AIService {
@@ -31,7 +32,7 @@ class AIService {
     return this.initialize();
   }
 
-  async processMessage(phone, messageData, contactName = null) {
+  async processMessage(phone, messageData, contactName = null, messageId = null) {
     try {
       // Check if AI is initialized
       if (!this.openai) {
@@ -40,6 +41,13 @@ class AIService {
           console.log('AI not initialized, skipping message processing');
           return null;
         }
+      }
+
+      // Check if we should respond to this phone
+      const shouldRespond = await messageTrackingService.shouldRespondToPhone(phone);
+      if (!shouldRespond) {
+        console.log(`⏭️ Skipping response for ${phone} - already handled or responded recently`);
+        return 'skipped';
       }
 
       // Anti-loop detection
@@ -57,6 +65,11 @@ class AIService {
         console.log('✅ Contact name added to messageData:', contactName);
       } else {
         console.log('⚠️ No contact name provided for:', phone);
+      }
+
+      // Store message ID for tracking
+      if (messageId) {
+        messageData.messageId = messageId;
       }
       
       // Queue message for delayed processing
@@ -135,6 +148,16 @@ class AIService {
         console.log('Sending humanized response to', phone);
         await this.sendHumanizedResponse(phone, response, supportedMessages);
         console.log('Response sent successfully');
+
+        // Mark messages as responded in tracking system
+        const lastMessageId = supportedMessages.length > 0 && supportedMessages[0].messageId ? 
+                             supportedMessages[0].messageId : null;
+        if (lastMessageId) {
+          await messageTrackingService.markResponseSent(phone, lastMessageId, 'ai');
+        } else {
+          // Mark all recent unresponded messages for this phone as handled
+          await messageTrackingService.markConversationResponded(phone, Date.now() - 300000); // Last 5 minutes
+        }
 
         // Process external notifications asynchronously (non-blocking)
         const externalNotificationsService = (await import('./externalNotificationsService.js')).default;
@@ -654,12 +677,9 @@ class AIService {
       
       const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:Contato\nTEL;type=CELL;waid=${formattedPhone}:${finalFormattedPhone}\nEND:VCARD`;
       
-      await whatsappService.sendMessage(phone, {
-        contacts: [{
-          displayName: 'Contato',
-          vcard: vcard
-        }]
-      });
+      // Enviar como texto simples em vez de cartão de contato para evitar erros
+      const contactText = `📱 *Contato:*\n${finalFormattedPhone}`;
+      await whatsappService.sendMessage(phone, { text: contactText });
     } catch (error) {
       console.error('Error sending contact card:', error);
     }

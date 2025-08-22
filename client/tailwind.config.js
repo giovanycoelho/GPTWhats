@@ -6,38 +6,10 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        primary: {
-          50: '#f0f9ff',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-        },
-        success: {
-          500: '#10b981',
-          600: '#059669',
-        },
-        warning: {
-          500: '#f59e0b',
-          600: '#d97706',
-        },
-        error: {
-          500: '#ef4444',
-          600: '#dc2626',
-        }
-      },
       backgroundImage: {
-        'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
         'dark-gradient': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
       },
-      backdropBlur: {
-        xs: '2px',
-      },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'bounce-slow': 'bounce 2s infinite',
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
       },
@@ -54,4 +26,13 @@ export default {
     },
   },
   plugins: [],
+  corePlugins: {
+    // Disable unused features to reduce bundle size
+    textOpacity: false,
+    backgroundOpacity: false,
+    borderOpacity: false,
+    divideOpacity: false,
+    placeholderOpacity: false,
+    ringOpacity: false,
+  }
 }

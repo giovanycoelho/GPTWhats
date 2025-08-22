@@ -1,0 +1,111 @@
+name: Build and Release GPTWhats
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.1)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Check out Git repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install backend dependencies
+      run: npm ci
+
+    - name: Install frontend dependencies
+      run: |
+        cd client
+        npm ci
+        cd ..
+
+    - name: Build React app
+      run: |
+        cd client
+        npm run build
+        cd ..
+
+    - name: Create placeholder assets (if needed)
+      run: |
+        if (!(Test-Path "assets")) { mkdir assets }
+        if (!(Test-Path "assets/icon.png")) { 
+          # Create placeholder icon - replace with actual icon
+          New-Item -ItemType File -Path "assets/icon.png" -Force
+        }
+        if (!(Test-Path "assets/icon.ico")) { 
+          # Create placeholder icon - replace with actual icon
+          New-Item -ItemType File -Path "assets/icon.ico" -Force
+        }
+      shell: powershell
+
+    - name: Build Electron app
+      run: npm run build:win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: GPTWhats-Windows
+        path: |
+          dist/*.exe
+          dist/*.yml
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/v')
+      with:
+        files: |
+          dist/*.exe
+          dist/latest.yml
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## 🚀 GPTWhats v${{ github.ref_name }}
+          
+          ### 📦 Downloads
+          - **Windows Installer**: `GPTWhats Setup ${{ github.ref_name }}.exe`
+          - **Portable**: Disponível na pasta `dist/win-unpacked/` após build
+          
+          ### 🔄 Auto-Updates
+          Se você já tem o GPTWhats instalado, será notificado automaticamente desta atualização.
+          
+          ### 📋 Novidades nesta versão:
+          - Veja as mudanças detalhadas nas notas de release automáticas abaixo
+          
+          ### 🆘 Suporte
+          - Encontrou um bug? [Abra uma issue](https://github.com/${{ github.repository }}/issues)
+          - Precisa de ajuda? Consulte a [documentação](https://github.com/${{ github.repository }}/blob/main/README.md)
+          
+          ---
+          
+          **Instalação**: Baixe o arquivo `GPTWhats Setup ${{ github.ref_name }}.exe` e execute.
+          **Atualização**: O app instalado será notificado automaticamente.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update latest.yml for auto-updater
+      run: |
+        if (Test-Path "dist/latest.yml") {
+          Write-Host "✅ latest.yml criado com sucesso para auto-updates"
+          Get-Content "dist/latest.yml"
+        } else {
+          Write-Host "⚠️ latest.yml não encontrado"
+        }
+      shell: powershell
