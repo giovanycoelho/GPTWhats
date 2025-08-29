@@ -8,7 +8,8 @@ import {
   Bot,
   Activity,
   Volume2,
-  Bell
+  Bell,
+  UserPlus
 } from 'lucide-react'
 import { useSocket } from '../../contexts/SocketContext'
 import clsx from 'clsx'
@@ -43,6 +44,11 @@ const Sidebar = () => {
       name: 'Notificações Externas',
       path: '/external-notifications',
       icon: Bell
+    },
+    {
+      name: 'Follow-up Inteligente',
+      path: '/followup',
+      icon: UserPlus
     },
     {
       name: 'Configurações',

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Save, Key, Bot, Volume2, Smile, Phone, Clock, Brain, User, Contact } from 'lucide-react'
+import { Save, Key, Bot, Volume2, Smile, Phone, Clock, Brain, User, Contact, RefreshCw, Inbox } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
 import toast from 'react-hot-toast'
 import SettingsSection from '../components/Settings/SettingsSection'
@@ -66,10 +66,29 @@ const Settings = () => {
     }
   }
 
+  // Helper function to convert string config values to boolean
+  const getBooleanValue = (configKey) => {
+    const value = localConfigs[configKey]
+    return value === 'true' || value === true
+  }
+
+  // Helper function to handle boolean toggle changes
+  const handleBooleanChange = (key, booleanValue) => {
+    const stringValue = booleanValue.toString()
+    handleInputChange(key, stringValue)
+  }
+
   const handleSaveAll = async () => {
     try {
       setSaving(true)
-      const success = await updateMultipleConfigs(localConfigs)
+      
+      // Filter out masked API key to prevent it from being saved
+      const configsToSave = { ...localConfigs }
+      if (configsToSave.openai_api_key && configsToSave.openai_api_key.includes('*')) {
+        delete configsToSave.openai_api_key
+      }
+      
+      const success = await updateMultipleConfigs(configsToSave)
       if (success) {
         toast.success('Configurações salvas com sucesso!')
       } else {
@@ -84,6 +103,12 @@ const Settings = () => {
 
   const handleSaveSingle = async (key) => {
     try {
+      // Don't save masked API key
+      if (key === 'openai_api_key' && localConfigs[key] && localConfigs[key].includes('*')) {
+        toast.error('API key está mascarada. Digite uma nova chave válida.')
+        return
+      }
+      
       const success = await updateConfig(key, localConfigs[key])
       if (success) {
         toast.success('Configuração salva!')
@@ -212,6 +237,14 @@ const Settings = () => {
                 hint="Controla quanta 'reflexão' o GPT-5 Mini aplica antes de responder. Níveis mais altos resultam em respostas mais elaboradas, mas levam mais tempo."
               />
               
+              <SettingsToggle
+                label="Validação Rigorosa de Respostas"
+                description="Ativar validação automática para garantir que a IA siga o prompt configurado"
+                value={getBooleanValue('response_validation_enabled')}
+                onChange={(value) => handleBooleanChange('response_validation_enabled', value)}
+                icon={Brain}
+              />
+              
               <div className="text-xs text-gray-500 bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/20 p-4 rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
                   <Brain className="w-4 h-4 text-purple-400" />
@@ -225,6 +258,18 @@ const Settings = () => {
                   <li><strong>Alto:</strong> Reflexão profunda (~10-30s) - Para tarefas analíticas</li>
                 </ul>
                 <p className="mt-2 text-purple-300"><strong>Recomendado:</strong> Use "Mínimo" para conversas rápidas no WhatsApp ou "Baixo" para um pouco mais de qualidade.</p>
+                
+                <div className="mt-4 pt-3 border-t border-purple-500/20">
+                  <p className="mb-2 text-purple-300 font-semibold">🛡️ Validação Rigorosa de Respostas</p>
+                  <p className="text-xs text-gray-400">Quando ativada, todas as respostas passam por uma validação automática que:</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-500 text-xs ml-2">
+                    <li>Verifica se a IA está seguindo seu prompt configurado</li>
+                    <li>Detecta quando a IA inventa informações não fornecidas</li>
+                    <li>Corrige automaticamente respostas fora do contexto</li>
+                    <li>Garante limite de caracteres sempre respeitado</li>
+                  </ul>
+                  <p className="mt-2 text-xs text-yellow-400"><strong>⚠️ Importante:</strong> Pode aumentar ligeiramente o tempo de resposta, mas garante maior fidelidade ao prompt.</p>
+                </div>
               </div>
             </div>
           </SettingsSection>
@@ -277,33 +322,49 @@ const Settings = () => {
               <SettingsToggle
                 label="Resposta por Áudio"
                 description="Responder com áudio quando receber áudio"
-                value={localConfigs.audio_enabled === 'true'}
-                onChange={(value) => handleInputChange('audio_enabled', value.toString())}
+                value={getBooleanValue('audio_enabled')}
+                onChange={(value) => handleBooleanChange('audio_enabled', value)}
                 icon={Volume2}
               />
               
               <SettingsToggle
                 label="Usar Emojis"
                 description="Adicionar emojis naturalmente nas respostas"
-                value={localConfigs.emoji_enabled === 'true'}
-                onChange={(value) => handleInputChange('emoji_enabled', value.toString())}
+                value={getBooleanValue('emoji_enabled')}
+                onChange={(value) => handleBooleanChange('emoji_enabled', value)}
                 icon={Smile}
               />
               
               <SettingsToggle
                 label="Personalizar com Nome do Cliente"
                 description="Usar o nome do WhatsApp do cliente nas respostas de forma natural"
-                value={localConfigs.use_client_name === 'true'}
-                onChange={(value) => handleInputChange('use_client_name', value.toString())}
+                value={getBooleanValue('use_client_name')}
+                onChange={(value) => handleBooleanChange('use_client_name', value)}
                 icon={User}
               />
               
               <SettingsToggle
                 label="Enviar Contatos como Cards"
                 description="Enviar números de telefone no formato de cartão do WhatsApp"
-                value={localConfigs.contact_card_enabled === 'true'}
-                onChange={(value) => handleInputChange('contact_card_enabled', value.toString())}
+                value={getBooleanValue('contact_card_enabled')}
+                onChange={(value) => handleBooleanChange('contact_card_enabled', value)}
                 icon={Contact}
+              />
+
+              <SettingsToggle
+                label="Recuperação Inteligente"
+                description="Ativar recuperação inteligente de conversas perdidas na conexão"
+                value={getBooleanValue('smart_recovery_enabled')}
+                onChange={(value) => handleBooleanChange('smart_recovery_enabled', value)}
+                icon={RefreshCw}
+              />
+
+              <SettingsToggle
+                label="Mensagens Pendentes"
+                description="Processar mensagens pendentes automaticamente na conexão"
+                value={getBooleanValue('pending_messages_enabled')}
+                onChange={(value) => handleBooleanChange('pending_messages_enabled', value)}
+                icon={Inbox}
               />
             </div>
           </SettingsSection>
@@ -325,8 +386,8 @@ const Settings = () => {
               <SettingsToggle
                 label="Rejeitar Chamadas"
                 description="Rejeitar chamadas automaticamente após 3 segundos"
-                value={localConfigs.call_rejection_enabled === 'true'}
-                onChange={(value) => handleInputChange('call_rejection_enabled', value.toString())}
+                value={getBooleanValue('call_rejection_enabled')}
+                onChange={(value) => handleBooleanChange('call_rejection_enabled', value)}
                 icon={Phone}
               />
               

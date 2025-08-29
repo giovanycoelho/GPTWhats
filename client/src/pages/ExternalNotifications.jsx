@@ -15,6 +15,50 @@ import {
   ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import SettingsToggle from '../components/Settings/SettingsToggle'
+
+// Componente de toggle simples para uso inline
+const SimpleToggle = ({ checked, onChange, size = 'md' }) => {
+  const sizeClasses = {
+    sm: 'w-8 h-4',
+    md: 'w-11 h-6'
+  }
+  
+  const circleClasses = {
+    sm: 'h-3 w-3 after:top-[1px] after:left-[1px]',
+    md: 'h-5 w-5 after:top-[2px] after:left-[2px]'
+  }
+
+  return (
+    <div className="flex items-center space-x-2">
+      <span className={`text-xs font-medium transition-colors duration-200 ${
+        checked ? 'text-gray-400' : 'text-gray-300'
+      }`}>
+        OFF
+      </span>
+      
+      <label className="relative inline-flex items-center cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only peer"
+        />
+        <div className={`${sizeClasses[size]} bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute ${circleClasses[size]} after:bg-white after:border-gray-300 after:border after:rounded-full after:transition-all ${
+          checked 
+            ? 'bg-green-500 border-green-400' 
+            : 'bg-gray-700 border-gray-600'
+        }`} />
+      </label>
+      
+      <span className={`text-xs font-medium transition-colors duration-200 ${
+        checked ? 'text-green-400' : 'text-gray-400'
+      }`}>
+        ON
+      </span>
+    </div>
+  )
+}
 
 const ExternalNotifications = () => {
   const [settings, setSettings] = useState({
@@ -209,64 +253,34 @@ const ExternalNotifications = () => {
           
           <div className="space-y-6">
             {/* Master Enable */}
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-              <div>
-                <h3 className="text-white font-medium">Ativar Notificações Externas</h3>
-                <p className="text-gray-400 text-sm">Habilita todo o sistema de notificações</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.enabled}
-                  onChange={(e) => updateSettings({ ...settings, enabled: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-              </label>
-            </div>
+            <SettingsToggle
+              label="Ativar Notificações Externas"
+              description="Habilita todo o sistema de notificações"
+              value={settings.enabled}
+              onChange={(value) => updateSettings({ ...settings, enabled: value })}
+              icon={Bell}
+            />
 
             {/* WhatsApp Links */}
             <div className={`${!settings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ExternalLink className="w-5 h-5 text-green-400" />
-                  <div>
-                    <h3 className="text-white font-medium">Notificar Links WhatsApp</h3>
-                    <p className="text-gray-400 text-sm">Envia notificação quando a IA compartilha um link do WhatsApp</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.whatsapp_links_enabled}
-                    onChange={(e) => updateSettings({ ...settings, whatsapp_links_enabled: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-              </div>
+              <SettingsToggle
+                label="Notificar Links WhatsApp"
+                description="Envia notificação quando a IA compartilha um link do WhatsApp"
+                value={settings.whatsapp_links_enabled}
+                onChange={(value) => updateSettings({ ...settings, whatsapp_links_enabled: value })}
+                icon={ExternalLink}
+              />
             </div>
 
             {/* Custom Rules */}
             <div className={`${!settings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <UserCheck className="w-5 h-5 text-blue-400" />
-                  <div>
-                    <h3 className="text-white font-medium">Regras Personalizadas</h3>
-                    <p className="text-gray-400 text-sm">Detecta situações específicas e notifica contatos definidos</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.custom_rules_enabled}
-                    onChange={(e) => updateSettings({ ...settings, custom_rules_enabled: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
+              <SettingsToggle
+                label="Regras Personalizadas"
+                description="Detecta situações específicas e notifica contatos definidos"
+                value={settings.custom_rules_enabled}
+                onChange={(value) => updateSettings({ ...settings, custom_rules_enabled: value })}
+                icon={UserCheck}
+              />
             </div>
           </div>
         </div>
@@ -328,15 +342,11 @@ const ExternalNotifications = () => {
                       </div>
                       
                       <div className="flex items-center space-x-2 ml-4">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={rule.enabled}
-                            onChange={(e) => toggleRuleEnabled(rule.id, e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-8 h-4 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
+                        <SimpleToggle
+                          checked={rule.enabled}
+                          onChange={(checked) => toggleRuleEnabled(rule.id, checked)}
+                          size="sm"
+                        />
                         
                         <button
                           onClick={() => setEditingRule(rule)}

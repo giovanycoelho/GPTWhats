@@ -12,6 +12,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Contacts = lazy(() => import('./pages/Contacts'))
 const AudioResponses = lazy(() => import('./pages/AudioResponses'))
 const ExternalNotifications = lazy(() => import('./pages/ExternalNotifications'))
+const FollowUp = lazy(() => import('./pages/FollowUp'))
 
 // Loading component
 const PageLoader = () => (
@@ -40,6 +41,7 @@ function App() {
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/audio-responses" element={<AudioResponses />} />
                   <Route path="/external-notifications" element={<ExternalNotifications />} />
+                  <Route path="/followup" element={<FollowUp />} />
                 </Routes>
               </Suspense>
             </Layout>

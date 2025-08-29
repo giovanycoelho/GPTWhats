@@ -1,6 +1,8 @@
 export function extractLinksAndPhones(text) {
   const urlRegex = /(https?:\/\/[^\s]+)/gi;
   const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+  // WhatsApp link regex - specific for wa.me links
+  const whatsappLinkRegex = /(https:\/\/wa\.me\/[^\s]+)/gi;
   
   // More specific phone regex that looks for standalone phone numbers
   // Detects: +5547991654220, (47) 99165-4220, 47 99165-4220, etc.
@@ -8,15 +10,42 @@ export function extractLinksAndPhones(text) {
 
   const links = [];
   const phones = [];
+  const whatsappLinks = [];
   
   let cleanText = text;
+  
+  // Check if the text is likely just a list of contact info
+  const contactInfoPatterns = [
+    /^\s*(\+?[\d\s\-\(\)]{10,}\s*[,;\n]?\s*)+$/,  // Just phone numbers
+    /^\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\s*[,;\n]?\s*)+$/,  // Just emails
+    /^\s*(https?:\/\/[^\s]+\s*[,;\n]?\s*)+$/  // Just URLs
+  ];
+  
+  const isContactList = contactInfoPatterns.some(pattern => pattern.test(text));
+  
+  // If it's just a contact list, preserve some context in clean text
+  if (isContactList) {
+    cleanText = '[Informações de contato enviadas]';
+  }
 
-  // Extract URLs
+  // Extract WhatsApp links first (they are more specific)
+  const whatsappLinkMatches = text.match(whatsappLinkRegex);
+  if (whatsappLinkMatches) {
+    whatsappLinkMatches.forEach(waLink => {
+      whatsappLinks.push(waLink.trim());
+      cleanText = cleanText.replace(waLink, '').trim();
+    });
+  }
+
+  // Extract other URLs (excluding already processed WhatsApp links)
   const urlMatches = text.match(urlRegex);
   if (urlMatches) {
     urlMatches.forEach(url => {
-      links.push(url.trim());
-      cleanText = cleanText.replace(url, '').trim();
+      // Skip if it's already a processed WhatsApp link
+      if (!whatsappLinks.includes(url.trim())) {
+        links.push(url.trim());
+        cleanText = cleanText.replace(url, '').trim();
+      }
     });
   }
 
@@ -50,7 +79,8 @@ export function extractLinksAndPhones(text) {
   return {
     text: cleanText,
     links,
-    phones
+    phones,
+    whatsappLinks
   };
 }
 

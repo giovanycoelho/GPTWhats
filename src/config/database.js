@@ -154,6 +154,49 @@ export const initializeDatabase = async () => {
       error_message TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (rule_id) REFERENCES notification_rules (id)
+    )`,
+
+    // Follow-up system tables
+    `CREATE TABLE IF NOT EXISTS followup_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      enabled BOOLEAN DEFAULT FALSE,
+      generate_prompt TEXT DEFAULT 'Analise a conversa e identifique se o cliente demonstrou interesse em produtos/serviços mas não finalizou a compra, ou se ficou com dúvidas pendentes, ou se a conversa terminou sem conclusão satisfatória.',
+      no_generate_prompt TEXT DEFAULT 'NÃO gere followup se: cliente já comprou, cliente disse que não tem interesse, cliente pediu para não entrar em contato, conversa foi finalizada satisfatoriamente, cliente demonstrou irritação.',
+      inactivity_hours INTEGER DEFAULT 24,
+      delay_hours INTEGER DEFAULT 2,
+      max_followups_per_conversation INTEGER DEFAULT 2,
+      followup_interval_hours INTEGER DEFAULT 168,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS followup_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT NOT NULL,
+      conversation_id INTEGER,
+      status TEXT DEFAULT 'pending',
+      analysis_result TEXT,
+      scheduled_for DATETIME,
+      attempts INTEGER DEFAULT 0,
+      last_attempt DATETIME,
+      followup_message TEXT,
+      conversation_context TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS followup_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT NOT NULL,
+      followup_queue_id INTEGER,
+      message_sent TEXT,
+      sent_at DATETIME,
+      response_received BOOLEAN DEFAULT FALSE,
+      response_at DATETIME,
+      followup_type TEXT DEFAULT 'automatic',
+      success BOOLEAN DEFAULT TRUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (followup_queue_id) REFERENCES followup_queue (id)
     )`
   ];
 
@@ -162,6 +205,21 @@ export const initializeDatabase = async () => {
       await db.run(tableSQL);
     } catch (error) {
       console.error('Error creating table:', error);
+    }
+  }
+
+  // Create indexes for follow-up performance
+  const indexes = [
+    `CREATE INDEX IF NOT EXISTS idx_followup_queue_phone ON followup_queue(phone)`,
+    `CREATE INDEX IF NOT EXISTS idx_followup_queue_status ON followup_queue(status, scheduled_for)`,
+    `CREATE INDEX IF NOT EXISTS idx_followup_history_phone ON followup_history(phone, sent_at)`
+  ];
+
+  for (const indexSQL of indexes) {
+    try {
+      await db.run(indexSQL);
+    } catch (error) {
+      console.error('Error creating index:', error);
     }
   }
 

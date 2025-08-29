@@ -170,9 +170,12 @@ class WhatsAppService {
       // Set initial offline status
       await this.setOfflineStatus();
 
-      // Initialize and process pending messages
+      // Initialize and process pending messages with smart recovery
       await pendingMessagesService.initializeService();
-      await pendingMessagesService.onWhatsAppConnected();
+      
+      // Import and use smart recovery service
+      const smartRecoveryService = (await import('./smartRecoveryService.js')).default;
+      await smartRecoveryService.onWhatsAppConnected();
     } else if (connection === 'connecting') {
       console.log('🔄 Connecting to WhatsApp...');
       this.connectionState = 'connecting';
@@ -262,6 +265,10 @@ class WhatsAppService {
         throw new Error('WhatsApp not connected');
       }
 
+      // Log detalhado para debug de mensagens automáticas
+      const messagePreview = message.text?.substring(0, 50) || '[Media]';
+      console.log(`📤 Enviando mensagem para ${to}: "${messagePreview}"`);
+      
       // Set online status before sending
       await this.setOnlineStatus();
 

@@ -22,7 +22,8 @@
       "Bash(npm run build:*)",
       "Bash(npm start)",
       "Bash(dir node_modules.binelectron*)",
-      "Bash(\"./node_modules/.bin/electron.cmd\" .)"
+      "Bash(\"./node_modules/.bin/electron.cmd\" .)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

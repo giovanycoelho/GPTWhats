@@ -146,16 +146,26 @@ const AudioResponses = () => {
           <span>Texto de Teste</span>
         </h3>
         
-        <textarea
-          value={testText}
-          onChange={(e) => setTestText(e.target.value)}
-          className="input-field h-24 resize-none"
-          placeholder="Digite um texto para testar as vozes..."
-          maxLength={200}
-        />
-        
-        <div className="mt-2 text-xs text-gray-500">
-          {testText.length}/200 caracteres
+        <div className="space-y-2">
+          <textarea
+            value={testText}
+            onChange={(e) => setTestText(e.target.value)}
+            className="input-glass w-full h-24 resize-none"
+            placeholder="Digite um texto para testar as vozes..."
+            maxLength={200}
+          />
+          
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-gray-500">
+              {testText.length}/200 caracteres
+            </p>
+            <button
+              onClick={() => setTestText('Olá! Esta é uma demonstração de voz da Patrícia da Premix Concreto.')}
+              className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+            >
+              Restaurar texto padrão
+            </button>
+          </div>
         </div>
       </motion.div>
 

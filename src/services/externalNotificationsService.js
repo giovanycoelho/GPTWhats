@@ -34,7 +34,7 @@ class ExternalNotificationsService {
     }
   }
 
-  async checkWhatsAppLinkNotification(response, sourcePhone, clientName) {
+  async checkWhatsAppLinkNotification(response, sourcePhone, clientName, conversation) {
     try {
       const settings = await this.getSettings();
       
@@ -42,16 +42,46 @@ class ExternalNotificationsService {
         return;
       }
 
-      // Detect WhatsApp links in response
-      const whatsappLinkRegex = /https:\/\/wa\.me\/(\d+)/g;
-      const matches = response.match(whatsappLinkRegex);
+      const whatsappLinks = new Set(); // Use Set to avoid duplicates
       
-      if (matches && matches.length > 0) {
-        for (const link of matches) {
-          const phoneMatch = link.match(/https:\/\/wa\.me\/(\d+)/);
+      // Method 1: Check response text for WhatsApp links (backward compatibility)
+      const whatsappLinkRegex = /(https:\/\/wa\.me\/[^\s]+)/g;
+      const responseMatches = response.match(whatsappLinkRegex);
+      
+      if (responseMatches && responseMatches.length > 0) {
+        responseMatches.forEach(link => whatsappLinks.add(link));
+      }
+      
+      // Method 2: Check recent conversation messages for WhatsApp link cards/texts
+      if (conversation && conversation.messages) {
+        const recentMessages = conversation.messages.slice(-3); // Check last 3 messages
+        
+        for (const message of recentMessages) {
+          // Check for messages marked as WhatsApp link cards or texts
+          if (message.role === 'assistant' && 
+              (message.messageType === 'whatsapp_link_card' || message.messageType === 'whatsapp_link_text') && 
+              message.originalLink) {
+            whatsappLinks.add(message.originalLink);
+          }
+          
+          // Also check message content for links (fallback)
+          if (message.content) {
+            const contentMatches = message.content.match(whatsappLinkRegex);
+            if (contentMatches) {
+              contentMatches.forEach(link => whatsappLinks.add(link));
+            }
+          }
+        }
+      }
+      
+      // Process all found WhatsApp links
+      if (whatsappLinks.size > 0) {
+        for (const fullLink of whatsappLinks) {
+          // Extract just the phone number from the link for identification
+          const phoneMatch = fullLink.match(/https:\/\/wa\.me\/(\d+)/);
           if (phoneMatch) {
-            const targetPhone = phoneMatch[1];
-            await this.sendWhatsAppLinkNotification(sourcePhone, targetPhone, clientName, response);
+            const phoneForId = phoneMatch[1];
+            await this.sendWhatsAppLinkNotification(sourcePhone, phoneForId, clientName, response, fullLink);
           }
         }
       }
@@ -120,10 +150,9 @@ Seja preciso e evite falsos positivos.
     }).join('\n');
   }
 
-  async sendWhatsAppLinkNotification(sourcePhone, targetPhone, clientName, originalResponse) {
+  async sendWhatsAppLinkNotification(sourcePhone, phoneForId, clientName, originalResponse, whatsappLink) {
     try {
       const contactsService = await import('./contactsService.js');
-      const whatsappService = await import('./whatsappService.js');
       
       // Get client info
       const sourceContact = await contactsService.default.getContact(sourcePhone);
@@ -132,7 +161,7 @@ Seja preciso e evite falsos positivos.
         phone: this.formatPhoneForDisplay(sourcePhone)
       };
 
-      // Create notification message
+      // Create notification message with clickable link instead of trying to send directly
       const notificationMessage = `🔔 *Notificação Automática*
 
 📱 *Novo contato compartilhado via WhatsApp*
@@ -146,21 +175,27 @@ O cliente solicitou informações e recebeu seu contato via link do WhatsApp.
 🤖 *Resposta da IA:*
 "${originalResponse.substring(0, 200)}${originalResponse.length > 200 ? '...' : ''}"
 
+🔗 *Clique no link abaixo para iniciar conversa com o cliente:*
+${whatsappLink}
+
 ---
 _Notificação gerada automaticamente pelo GPTWhats_`;
 
-      // Send notification
-      await whatsappService.default.sendMessage(`${targetPhone}@s.whatsapp.net`, {
-        text: notificationMessage
-      });
+      // Instead of trying to extract and send via WhatsApp API, 
+      // we'll use a webhook or external notification method
+      const success = await this.sendExternalNotification(phoneForId, notificationMessage, whatsappLink);
 
       // Log notification
-      await this.logNotification('whatsapp_link', sourcePhone, targetPhone, null, notificationMessage, true);
+      await this.logNotification('whatsapp_link', sourcePhone, phoneForId, null, notificationMessage, success);
       
-      console.log(`📧 WhatsApp link notification sent to ${targetPhone}`);
+      if (success) {
+        console.log(`📧 External WhatsApp link notification processed for ${phoneForId}`);
+      } else {
+        console.log(`⚠️ External notification fallback: WhatsApp link ${whatsappLink} available for manual contact`);
+      }
     } catch (error) {
       console.error('Error sending WhatsApp link notification:', error);
-      await this.logNotification('whatsapp_link', sourcePhone, targetPhone, null, 'Failed to send', false, error.message);
+      await this.logNotification('whatsapp_link', sourcePhone, phoneForId, null, 'Failed to send', false, error.message);
     }
   }
 
@@ -235,13 +270,106 @@ _Notificação gerada automaticamente pelo GPTWhats_`;
     return cleanPhone;
   }
 
+  async sendExternalNotification(phoneForId, notificationMessage, whatsappLink) {
+    try {
+      // Try multiple notification methods in order of preference
+      
+      // Method 1: Try to send via WhatsApp API if the phone exists in contacts
+      try {
+        const whatsappService = await import('./whatsappService.js');
+        const contactsService = await import('./contactsService.js');
+        
+        // Check if we have this contact in our database (meaning it's been active)
+        const existingContact = await contactsService.default.getContact(`${phoneForId}@s.whatsapp.net`);
+        
+        if (existingContact) {
+          console.log(`📞 Sending notification via WhatsApp API to known contact: ${phoneForId}`);
+          await whatsappService.default.sendMessage(`${phoneForId}@s.whatsapp.net`, {
+            text: notificationMessage
+          });
+          return true;
+        }
+      } catch (whatsappError) {
+        console.log(`⚠️ WhatsApp API failed for ${phoneForId}, trying alternatives...`);
+      }
+      
+      // Method 2: Use webhook if configured
+      const webhookUrl = await this.getWebhookUrl();
+      if (webhookUrl) {
+        try {
+          const webhook = await import('node:https');
+          const webhookData = {
+            type: 'whatsapp_link_notification',
+            phoneForId: phoneForId,
+            whatsappLink: whatsappLink,
+            message: notificationMessage,
+            timestamp: new Date().toISOString()
+          };
+          
+          // Send to webhook (implementation depends on your webhook service)
+          await this.sendWebhookNotification(webhookUrl, webhookData);
+          console.log(`🌐 Notification sent via webhook for ${phoneForId}`);
+          return true;
+        } catch (webhookError) {
+          console.log(`⚠️ Webhook failed for ${phoneForId}:`, webhookError.message);
+        }
+      }
+      
+      // Method 3: Log to console and database for manual processing
+      console.log(`📋 Manual notification required for ${phoneForId}:`);
+      console.log(`🔗 WhatsApp Link: ${whatsappLink}`);
+      console.log(`📄 Message: ${notificationMessage}`);
+      
+      return false; // Indicates manual processing needed
+      
+    } catch (error) {
+      console.error('Error in external notification:', error);
+      return false;
+    }
+  }
+
+  async getWebhookUrl() {
+    try {
+      const settings = await this.getSettings();
+      return settings.webhook_url || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async sendWebhookNotification(webhookUrl, data) {
+    try {
+      const fetch = await import('node-fetch').then(m => m.default).catch(() => null);
+      if (!fetch) {
+        console.log('node-fetch not available for webhook');
+        return false;
+      }
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook responded with status: ${response.status}`);
+      }
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Process notifications asynchronously to not block response generation
   async processNotificationsAsync(response, conversation, sourcePhone, clientName) {
     // Run in background without awaiting
     setImmediate(async () => {
       try {
-        // Check WhatsApp link notifications
-        await this.checkWhatsAppLinkNotification(response, sourcePhone, clientName);
+        // Check WhatsApp link notifications (now includes conversation context)
+        await this.checkWhatsAppLinkNotification(response, sourcePhone, clientName, conversation);
         
         // Check custom rule notifications
         await this.checkCustomRuleNotifications(response, conversation, sourcePhone, clientName);

@@ -13,7 +13,10 @@ router.get('/', async (req, res) => {
     const safeConfigs = { ...configs };
     if (safeConfigs.openai_api_key) {
       safeConfigs.openai_api_key_exists = true;
-      safeConfigs.openai_api_key = safeConfigs.openai_api_key.replace(/.(?=.{4})/g, '*');
+      // Only mask if key is longer than 8 characters to avoid masking short/invalid keys
+      if (safeConfigs.openai_api_key.length > 8) {
+        safeConfigs.openai_api_key = safeConfigs.openai_api_key.replace(/.(?=.{4})/g, '*');
+      }
     } else {
       safeConfigs.openai_api_key_exists = false;
     }
@@ -65,11 +68,20 @@ router.put('/:key', async (req, res) => {
       });
     }
     
+    // Don't save masked API keys
+    if (key === 'openai_api_key' && value.toString().includes('*')) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot save masked API key. Please provide a valid key.' 
+      });
+    }
+    
     const success = await configService.set(key, value.toString());
     
     if (success) {
       // If OpenAI API key was updated, reinitialize AI service
       if (key === 'openai_api_key') {
+        console.log('🔄 Reinitializing AI service with new API key');
         await aiService.reinitialize();
       }
       
@@ -102,11 +114,20 @@ router.put('/', async (req, res) => {
       });
     }
     
-    const success = await configService.setMultiple(configs);
+    // Filter out masked API keys to prevent overwriting valid ones
+    const filteredConfigs = { ...configs };
+    if (filteredConfigs.openai_api_key && 
+        filteredConfigs.openai_api_key.includes('*')) {
+      console.log('⚠️ Ignoring masked API key in bulk update');
+      delete filteredConfigs.openai_api_key;
+    }
+    
+    const success = await configService.setMultiple(filteredConfigs);
     
     if (success) {
       // If OpenAI API key was updated, reinitialize AI service
-      if (configs.openai_api_key) {
+      if (filteredConfigs.openai_api_key) {
+        console.log('🔄 Reinitializing AI service with new API key');
         await aiService.reinitialize();
       }
       
@@ -143,7 +164,9 @@ router.delete('/:key', async (req, res) => {
       max_response_length: '200',
       use_client_name: 'true',
       contact_card_enabled: 'true',
-      tts_voice: 'alloy'
+      tts_voice: 'alloy',
+      smart_recovery_enabled: 'false',
+      pending_messages_enabled: 'false'
     };
     
     const defaultValue = defaults[key] || '';
@@ -296,6 +319,16 @@ router.get('/schema/all', (req, res) => {
         { value: 'shimmer', label: 'Shimmer - Feminina suave e calorosa' }
       ],
       default: 'alloy'
+    },
+    smart_recovery_enabled: {
+      type: 'boolean',
+      description: 'Ativar recuperação inteligente de conversas perdidas na conexão',
+      default: false
+    },
+    pending_messages_enabled: {
+      type: 'boolean',
+      description: 'Processar mensagens pendentes automaticamente na conexão',
+      default: false
     }
   };
   

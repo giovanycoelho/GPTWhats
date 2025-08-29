@@ -118,10 +118,21 @@ class PendingMessagesService {
     
     this.processingInterval = setInterval(async () => {
       if (!this.isProcessingPending) {
-        const pending = await messageTrackingService.checkPendingMessages();
-        if (pending.length > 0) {
-          console.log(`🔔 Periodic check found ${pending.length} pending conversations`);
-          await this.processPendingMessagesOnConnection();
+        try {
+          const configService = (await import('./configService.js')).default;
+          const pendingMessagesEnabled = await configService.get('pending_messages_enabled');
+          
+          if (pendingMessagesEnabled !== 'true') {
+            return; // Skip if disabled
+          }
+          
+          const pending = await messageTrackingService.checkPendingMessages();
+          if (pending.length > 0) {
+            console.log(`🔔 Periodic check found ${pending.length} pending conversations`);
+            await this.processPendingMessagesOnConnection();
+          }
+        } catch (error) {
+          console.error('Error in periodic check:', error);
         }
       }
     }, checkInterval);
@@ -170,13 +181,29 @@ class PendingMessagesService {
 
   // Method to be called when WhatsApp connects
   async onWhatsAppConnected() {
-    console.log('📱 WhatsApp connected - processing pending messages...');
+    console.log('📱 WhatsApp connected - checking pending messages settings...');
     
-    // Wait a bit for connection to stabilize
-    await this.delay(5000);
-    
-    // Process pending messages
-    await this.processPendingMessagesOnConnection();
+    // Check if pending message processing is enabled
+    try {
+      const configService = (await import('./configService.js')).default;
+      const pendingMessagesEnabled = await configService.get('pending_messages_enabled');
+      
+      if (pendingMessagesEnabled !== 'true') {
+        console.log('⏭️ Processamento de mensagens pendentes desativado nas configurações');
+        return;
+      }
+      
+      console.log('📬 Processamento de mensagens pendentes ativado - iniciando...');
+      
+      // Wait a bit for connection to stabilize
+      await this.delay(5000);
+      
+      // Process pending messages
+      await this.processPendingMessagesOnConnection();
+      
+    } catch (error) {
+      console.error('Error checking pending messages settings:', error);
+    }
   }
 
   // Method to be called when WhatsApp disconnects

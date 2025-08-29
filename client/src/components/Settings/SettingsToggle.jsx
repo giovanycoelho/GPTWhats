@@ -19,26 +19,48 @@ const SettingsToggle = ({ label, description, value, onChange, icon: Icon }) => 
         </div>
       </div>
       
-      <button
-        onClick={() => onChange(!value)}
-        className={clsx(
-          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900',
-          value ? 'bg-primary-600' : 'bg-gray-600'
-        )}
-      >
-        <motion.span
-          initial={false}
-          animate={{
-            x: value ? 20 : 2
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30
-          }}
-          className="inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-        />
-      </button>
+      <div className="flex items-center space-x-2">
+        <span className={clsx(
+          'text-xs font-medium transition-colors duration-200',
+          value ? 'text-gray-400' : 'text-gray-300'
+        )}>
+          OFF
+        </span>
+        
+        <button
+          onClick={() => onChange(!value)}
+          className={clsx(
+            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900',
+            value 
+              ? 'bg-green-500 border-green-400 focus:ring-green-500' 
+              : 'bg-gray-700 border-gray-600 focus:ring-gray-500'
+          )}
+          title={value ? 'Clique para desativar' : 'Clique para ativar'}
+        >
+          <motion.span
+            initial={false}
+            animate={{
+              x: value ? 20 : 2
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 500,
+              damping: 30
+            }}
+            className={clsx(
+              'inline-block h-5 w-5 transform rounded-full shadow ring-0 transition duration-200 ease-in-out',
+              value ? 'bg-white' : 'bg-gray-300'
+            )}
+          />
+        </button>
+        
+        <span className={clsx(
+          'text-xs font-medium transition-colors duration-200',
+          value ? 'text-green-400' : 'text-gray-400'
+        )}>
+          ON
+        </span>
+      </div>
     </div>
   )
 }

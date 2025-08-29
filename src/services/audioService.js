@@ -27,13 +27,16 @@ class AudioService {
     try {
       await fs.mkdir(this.tempDir, { recursive: true });
     } catch (error) {
-      console.error('Error creating temp directory:', error);
+      console.error('❌ Erro criando diretório temp:', error);
     }
 
     // Initialize OpenAI for Whisper
     const apiKey = await configService.get('openai_api_key');
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
+      console.log('🤖 AudioService inicializado com OpenAI');
+    } else {
+      console.error('❌ Chave API OpenAI não encontrada - transcrição não funcionará');
     }
   }
 
@@ -44,7 +47,7 @@ class AudioService {
 
       // Write buffer to temporary file
       fs.writeFile(inputPath, oggBuffer)
-        .then(() => {
+        .then(async () => {
           ffmpeg(inputPath)
             .toFormat('mp3')
             .audioCodec('libmp3lame')
@@ -59,17 +62,22 @@ class AudioService {
                 
                 resolve(mp3Buffer);
               } catch (error) {
+                console.error('❌ Erro lendo arquivo MP3 convertido:', error);
                 reject(error);
               }
             })
             .on('error', async (error) => {
+              console.error('❌ Erro na conversão FFmpeg:', error);
               await this.cleanupFile(inputPath);
               await this.cleanupFile(outputPath);
               reject(error);
             })
             .save(outputPath);
         })
-        .catch(reject);
+        .catch((error) => {
+          console.error('❌ Erro escrevendo arquivo OGG temporário:', error);
+          reject(error);
+        });
     });
   }
 
@@ -79,14 +87,14 @@ class AudioService {
       if (!this.openai) {
         await this.init();
         if (!this.openai) {
-          console.log('OpenAI not initialized for transcription');
+          console.error('❌ OpenAI não configurado para transcrição');
           return '[Áudio não pôde ser transcrito - API não configurada]';
         }
       }
 
       // Validate audioBuffer
       if (!audioBuffer || !Buffer.isBuffer(audioBuffer)) {
-        console.error('Invalid audio buffer received:', typeof audioBuffer);
+        console.error('❌ Buffer de áudio inválido');
         return '[Áudio inválido]';
       }
 
@@ -97,18 +105,16 @@ class AudioService {
       try {
         // WhatsApp audio is typically OGG Opus, convert to MP3
         processedBuffer = await this.convertOggToMp3(audioBuffer);
-        console.log('Audio converted from OGG to MP3 successfully');
+        console.log('✅ Áudio convertido para transcrição');
       } catch (conversionError) {
-        console.log('OGG conversion failed, trying with original buffer:', conversionError.message);
+        console.error('❌ Conversão falhou, usando buffer original:', conversionError.message);
         processedBuffer = audioBuffer; // Fallback to original buffer
       }
 
       // Write to temporary file for Whisper
       await fs.writeFile(tempPath, processedBuffer);
-      console.log('Audio file written for Whisper, size:', processedBuffer.length, 'path:', tempPath);
 
       // Transcribe using Whisper
-      console.log('Starting Whisper transcription...');
       const transcription = await this.openai.audio.transcriptions.create({
         file: createReadStream(tempPath),
         model: 'whisper-1',
@@ -116,14 +122,14 @@ class AudioService {
         response_format: 'text'
       });
 
-      console.log('Whisper transcription completed:', transcription?.substring(0, 100) || 'empty');
+      console.log('✅ Áudio transcrito:', transcription ? `"${transcription.substring(0, 100)}..."` : 'vazio');
 
       // Cleanup
       await this.cleanupFile(tempPath);
 
       return transcription || '[Áudio não pôde ser transcrito]';
     } catch (error) {
-      console.error('Error transcribing audio:', error);
+      console.error('❌ Erro na transcrição:', error.message);
       return '[Erro na transcrição do áudio]';
     }
   }

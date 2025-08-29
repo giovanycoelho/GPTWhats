@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { initializeDatabase } from './config/database.js';
+import healthCheckService from './utils/healthCheck.js';
 // Restart server
 import { rateLimiterMiddleware } from './middleware/rateLimiter.js';
 import whatsappRoutes from './controllers/whatsappController.js';
@@ -18,6 +19,10 @@ import dashboardRoutes from './controllers/dashboardController.js';
 import audioRoutes from './controllers/audioController.js';
 import pendingMessagesRoutes from './controllers/pendingMessagesController.js';
 import externalNotificationsRoutes from './routes/externalNotificationsRoutes.js';
+import followupRoutes from './controllers/followupController.js';
+import smartRecoveryRoutes from './controllers/smartRecoveryController.js';
+import finalizationTestRoutes from './controllers/finalizationTestController.js';
+import finalizationDebugController from './controllers/finalizationDebugController.js';
 
 dotenv.config();
 
@@ -54,6 +59,44 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/pending', pendingMessagesRoutes);
 app.use('/api/external-notifications', externalNotificationsRoutes);
+app.use('/api/followup', followupRoutes);
+app.use('/api/smart-recovery', smartRecoveryRoutes);
+app.use('/api/finalization-test', finalizationTestRoutes);
+
+// Finalization debug routes
+app.get('/api/finalization/diagnostic/:phone', finalizationDebugController.getDiagnostic);
+app.post('/api/finalization/reset/:phone', finalizationDebugController.resetFinalization);
+app.get('/api/finalization/list-finalized', finalizationDebugController.listFinalized);
+app.post('/api/finalization/reset-all', finalizationDebugController.resetAllFinalizations);
+
+// Health check endpoint for 24/7 monitoring
+app.get('/api/health', (req, res) => {
+  try {
+    const health = healthCheckService.getHealthStatus();
+    const uptime = process.uptime();
+    const memUsage = process.memoryUsage();
+    
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(uptime),
+      uptimeFormatted: `${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+      memory: {
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+        rss: Math.round(memUsage.rss / 1024 / 1024)
+      },
+      lastHealthCheck: health,
+      version: process.env.npm_package_version || '1.0.0'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

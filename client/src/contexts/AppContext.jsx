@@ -23,7 +23,9 @@ const initialState = {
     call_rejection_message: '',
     max_response_length: '200',
     use_client_name: 'true',
-    contact_card_enabled: 'true'
+    contact_card_enabled: 'true',
+    smart_recovery_enabled: 'false',
+    pending_messages_enabled: 'false'
   },
   dashboard: {
     overview: null,
