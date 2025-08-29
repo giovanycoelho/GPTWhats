@@ -361,7 +361,21 @@ class AIService {
       // Clear active response state
       this.activeResponses.delete(phone);
     } catch (error) {
-      console.error('Error processing queued messages:', error);
+      const contactName = supportedMessages?.[0]?.contactName || 'Unknown';
+      console.error(`❌ Error processing queued messages for ${contactName} (${phone}):`, error);
+      console.error('Supported messages:', supportedMessages);
+      
+      // Try to send a basic error response to user
+      try {
+        const whatsappService = (await import('./whatsappService.js')).default;
+        await whatsappService.sendMessage(phone, { 
+          text: 'Desculpe, houve um erro ao processar sua mensagem. Tente novamente em alguns instantes.' 
+        });
+        console.log(`🔄 Error message sent to ${contactName} (${phone})`);
+      } catch (sendError) {
+        console.error('Failed to send error message:', sendError);
+      }
+      
       // Clear active response state on error
       this.activeResponses.delete(phone);
     }
@@ -1486,8 +1500,8 @@ Forneça apenas a resposta corrigida, sem explicações:`;
             content: prompt
           }
         ],
-        max_completion_tokens: 10,
-        temperature: 0.1
+        max_completion_tokens: 10
+        // Note: GPT-5 Mini only supports default temperature (1), so we omit this parameter
       });
 
       const result = response.choices[0]?.message?.content?.trim() || '';

@@ -200,23 +200,33 @@ async function handleIncomingMessage(message) {
     const isGroup = phone.endsWith('@g.us');
     const isStatus = phone === 'status@broadcast';
     const isFromMe = message.key.fromMe;
+    const contactName = message.pushName || message.pushname || message.notify || 'Unknown';
+    
+    console.log(`📨 Processing message from ${contactName} (${phone})`);
     
     // Skip group messages and status updates
     if (isGroup || isStatus) {
-      console.log(`Skipping ${isStatus ? 'status' : 'group'} message from:`, phone);
+      console.log(`⏭️ Skipping ${isStatus ? 'status' : 'group'} message from: ${contactName} (${phone})`);
       return;
     }
     
     // Handle outgoing messages (from us) - track manual responses
     if (isFromMe) {
+      console.log(`⬅️ Outgoing message detected from us to: ${contactName} (${phone})`);
       await messageTrackingService.detectManualResponse(phone, message.key.id);
       return;
     }
     
     // Track incoming message
+    console.log(`🔄 Preparing message data for ${contactName} (${phone})`);
     const messageData = await prepareMessageData(message);
     const messageId = message.key.id;
     const timestamp = message.messageTimestamp * 1000 || Date.now();
+    
+    // Validate message data
+    if (!messageData || (!messageData.text && !messageData.audio && !messageData.image)) {
+      console.log(`⚠️ Empty or invalid message data from ${contactName} (${phone}):`, messageData);
+    }
     
     await messageTrackingService.trackIncomingMessage(
       phone, 
@@ -226,15 +236,19 @@ async function handleIncomingMessage(message) {
     );
     
     // Update contact info and get contact name
-    const contactName = message.pushName || message.pushname || message.notify || null;
     console.log('📱 Contact name detected:', contactName, 'for phone:', phone);
     await updateContactInfo(phone, message);
     
     // Process with AI, passing contact name and message ID for tracking
+    console.log(`🤖 Sending message to AI service from ${contactName} (${phone})`);
     await aiService.processMessage(phone, messageData, contactName, messageId);
+    console.log(`✅ Message processing completed for ${contactName} (${phone})`);
     
   } catch (error) {
-    console.error('Error handling incoming message:', error);
+    const contactName = message?.pushName || message?.pushname || message?.notify || 'Unknown';
+    const phone = message?.key?.remoteJid || 'Unknown';
+    console.error(`❌ Error handling incoming message from ${contactName} (${phone}):`, error);
+    console.error('Message object:', JSON.stringify(message, null, 2));
   }
 }
 
@@ -281,6 +295,34 @@ async function prepareMessageData(message) {
       messageData.text = innerMessage.conversation;
     } else if (innerMessage.extendedTextMessage) {
       messageData.text = innerMessage.extendedTextMessage.text;
+    } else if (innerMessage.audioMessage) {
+      // Handle ephemeral audio messages
+      try {
+        const buffer = await whatsappService.downloadMediaMessage(message);
+        messageData.audio = buffer;
+        messageData.type = 'audio';
+        console.log('Ephemeral audio downloaded successfully, buffer size:', buffer?.length || 0);
+      } catch (error) {
+        console.error('Error processing ephemeral audio:', error);
+        messageData.text = 'Áudio temporário recebido (erro ao processar)';
+        messageData.type = 'text';
+      }
+    } else if (innerMessage.imageMessage) {
+      // Handle ephemeral image messages
+      try {
+        const buffer = await whatsappService.downloadMediaMessage(message);
+        messageData.image = buffer.toString('base64');
+        messageData.type = 'image';
+        messageData.caption = innerMessage.imageMessage.caption || '';
+        console.log('Ephemeral image downloaded successfully');
+      } catch (error) {
+        console.error('Error processing ephemeral image:', error);
+        messageData.text = 'Imagem temporária recebida (erro ao processar)';
+      }
+    } else {
+      console.log('🔄 Unsupported ephemeral message type:', Object.keys(innerMessage));
+      messageData.text = '[Mensagem temporária não suportada]';
+      messageData.type = 'ephemeral_unsupported';
     }
   } else if (message.message.audioMessage) {
     // Download and process audio
