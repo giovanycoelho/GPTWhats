@@ -304,7 +304,7 @@ router.get('/schema/all', (req, res) => {
     },
     contact_card_enabled: {
       type: 'boolean',
-      description: 'Enviar números de telefone no formato de cartão do WhatsApp',
+      description: 'Enviar links do WhatsApp (wa.me/xxxxx) como cartões de contato. Números normais sempre são enviados como texto.',
       default: true
     },
     tts_voice: {

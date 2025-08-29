@@ -194,7 +194,7 @@ router.post('/test-ai', async (req, res) => {
 });
 
 // Handle incoming WhatsApp message
-async function handleIncomingMessage(message) {
+export async function handleIncomingMessage(message) {
   try {
     const phone = message.key.remoteJid;
     const isGroup = phone.endsWith('@g.us');
@@ -355,11 +355,21 @@ async function prepareMessageData(message) {
     messageData.type = 'document';
     messageData.text = `Documento enviado: ${messageData.document.fileName}`;
   } else if (message.message.videoMessage) {
-    messageData.type = 'video';
-    messageData.text = 'Vídeo recebido';
+    // Check if it's a GIF (WhatsApp sends GIFs as videos with gifPlayback flag)
+    const isGif = message.message.videoMessage.gifPlayback || 
+                  message.message.videoMessage.caption?.toLowerCase().includes('gif') ||
+                  (message.message.videoMessage.seconds && message.message.videoMessage.seconds < 10);
+    
+    if (isGif) {
+      messageData.type = 'gif';
+      messageData.text = '🎬 GIF recebido';
+    } else {
+      messageData.type = 'video';
+      messageData.text = '🎥 Vídeo recebido';
+    }
   } else if (message.message.stickerMessage) {
     messageData.type = 'sticker';
-    messageData.text = 'Figurinha recebida';
+    messageData.text = '😄 Figurinha recebida';
   } else if (message.message.locationMessage) {
     messageData.type = 'location';
     messageData.text = 'Localização compartilhada';

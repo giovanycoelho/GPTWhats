@@ -142,8 +142,19 @@ if (hasBuiltFiles) {
 }
 
 // Socket.IO connection
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log('Client connected:', socket.id);
+  
+  // Sync WhatsApp state with the newly connected client
+  try {
+    const whatsappService = (await import('./services/whatsappService.js')).default;
+    // Small delay to ensure socket is fully established
+    setTimeout(() => {
+      whatsappService.syncStateWithFrontend();
+    }, 500);
+  } catch (error) {
+    console.log('Error syncing WhatsApp state:', error.message);
+  }
   
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -155,9 +166,61 @@ global.io = io;
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 GPTWhats - WhatsApp AI Bot initialized`);
+  
+  // Auto-connect WhatsApp on server startup
+  await autoConnectWhatsApp();
 });
+
+// Auto-connect function
+async function autoConnectWhatsApp() {
+  try {
+    console.log('🔄 Attempting automatic WhatsApp connection...');
+    
+    const whatsappService = (await import('./services/whatsappService.js')).default;
+    
+    // Check if there's an existing session
+    const hasExistingSession = await whatsappService.hasValidSession();
+    
+    if (hasExistingSession) {
+      console.log('📱 Found existing WhatsApp session, attempting to reconnect...');
+      console.log('⏱️ Connection timeout set to 30 seconds...');
+      
+      // Try to initialize with existing session (with timeout)
+      const connectionPromise = whatsappService.initializeWithAutoConnect();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout after 30 seconds')), 30000)
+      );
+      
+      try {
+        await Promise.race([connectionPromise, timeoutPromise]);
+        // Success message will be logged from WhatsAppService
+      } catch (error) {
+        console.log('⚠️ Failed to reconnect with existing session:', error.message);
+        console.log('🧹 Clearing corrupted session and preparing for new QR code...');
+        
+        // Clear the problematic session
+        await whatsappService.clearSession();
+        
+        // Wait a moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Initialize fresh (will generate new QR code)
+        console.log('🆕 Initializing fresh WhatsApp connection...');
+        await whatsappService.initialize();
+        console.log('📱 Ready for new QR code scan - check your frontend!');
+      }
+    } else {
+      console.log('📱 No existing session found, initializing fresh WhatsApp connection...');
+      await whatsappService.initialize();
+      console.log('📱 Ready for QR code scan - check your frontend!');
+    }
+  } catch (error) {
+    console.error('❌ Error in auto-connect:', error);
+    console.log('🔄 WhatsApp service available for manual connection via frontend');
+  }
+}
 
 export { io };

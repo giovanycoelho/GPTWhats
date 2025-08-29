@@ -953,12 +953,18 @@ Antes de responder, certifique-se de que:
         });
       }
       
-      // Handle WhatsApp links separately (always send as cards)
+      // Handle WhatsApp links - send as text
       if (whatsappLinks && whatsappLinks.length > 0) {
-        for (const whatsappLink of whatsappLinks) {
-          await this.delay(500);
-          await this.sendWhatsAppLinkAsCard(phone, whatsappLink);
-        }
+        const whatsappText = `🔗 *Links WhatsApp:*\n${whatsappLinks.join('\n')}`;
+        await whatsappService.sendMessage(phone, { text: whatsappText });
+        
+        // Save WhatsApp links message to conversation
+        await conversationService.addMessage(phone, {
+          role: 'assistant',
+          content: whatsappText,
+          timestamp: Date.now(),
+          messageType: 'whatsapp_links'
+        });
       }
       
       // If there's contact info to send, group it intelligently
@@ -978,27 +984,20 @@ Antes de responder, certifique-se de que:
           }
         });
         
-        // Send phone contacts (as cards if enabled, or grouped text)
+        // Send regular phone contacts (always as text, never as cards)
+        // Cards are only for WhatsApp links (wa.me/xxxxx) handled above
         if (uniquePhoneContacts.length > 0) {
-          if (contactCardEnabled) {
-            // Send each phone as a contact card
-            for (const phoneContact of uniquePhoneContacts) {
-              await this.delay(500);
-              await this.sendContactCard(phone, phoneContact.clean);
-            }
-          } else {
-            // Group phones in a single message
-            const phoneText = `📱 *Contatos:*\n${uniquePhoneContacts.map(p => p.value).join('\n')}`;
-            await whatsappService.sendMessage(phone, { text: phoneText });
-            
-            // Save grouped contact message to conversation with special marking
-            await conversationService.addMessage(phone, {
-              role: 'assistant',
-              content: phoneText,
-              timestamp: Date.now(),
-              messageType: 'contact_info' // Mark as contact info, not main conversation
-            });
-          }
+          // Always send regular phone numbers as grouped text
+          const phoneText = `📱 *Contatos:*\n${uniquePhoneContacts.map(p => p.value).join('\n')}`;
+          await whatsappService.sendMessage(phone, { text: phoneText });
+          
+          // Save grouped contact message to conversation with special marking
+          await conversationService.addMessage(phone, {
+            role: 'assistant',
+            content: phoneText,
+            timestamp: Date.now(),
+            messageType: 'contact_info' // Mark as contact info, not main conversation
+          });
         }
         
         // Send emails and links grouped
@@ -1023,124 +1022,8 @@ Antes de responder, certifique-se de que:
     }
   }
 
-  async sendContactCard(phone, cleanPhone) {
-    try {
-      const whatsappService = (await import('./whatsappService.js')).default;
-      let formattedPhone = cleanPhone;
-      
-      // Format Brazilian numbers correctly
-      if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
-        formattedPhone = `55${cleanPhone}`;
-      } else if (cleanPhone.length === 10 && !cleanPhone.startsWith('55')) {
-        formattedPhone = `55${cleanPhone}`;
-      }
-      
-      const finalFormattedPhone = formattedPhone.startsWith('+') ? formattedPhone : `+${formattedPhone}`;
-      
-      const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:Contato\nTEL;type=CELL;waid=${formattedPhone}:${finalFormattedPhone}\nEND:VCARD`;
-      
-      // Try to send as contact card first, fallback to text if it fails
-      try {
-        await whatsappService.sendMessage(phone, {
-          contacts: {
-            displayName: 'Contato',
-            contacts: [{
-              vcard: vcard
-            }]
-          }
-        });
-      } catch (contactError) {
-        console.log('Contact card failed, sending as text:', contactError.message);
-        const contactText = `📱 *Contato:*\n${finalFormattedPhone}`;
-        await whatsappService.sendMessage(phone, { text: contactText });
-      }
-    } catch (error) {
-      console.error('Error sending contact card:', error);
-    }
-  }
-
-  async sendWhatsAppLinkAsCard(phone, whatsappLink) {
-    try {
-      const whatsappService = (await import('./whatsappService.js')).default;
-      const conversationService = (await import('./conversationService.js')).default;
-      
-      // Extract phone number from WhatsApp link
-      const phoneMatch = whatsappLink.match(/https:\/\/wa\.me\/(\d+)/);
-      if (!phoneMatch) {
-        console.error('Invalid WhatsApp link format:', whatsappLink);
-        return;
-      }
-      
-      let contactPhone = phoneMatch[1];
-      let formattedPhone = contactPhone;
-      
-      // Format Brazilian numbers correctly for contact card
-      if (contactPhone.length === 11 && !contactPhone.startsWith('55')) {
-        formattedPhone = `55${contactPhone}`;
-      } else if (contactPhone.length === 10 && !contactPhone.startsWith('55')) {
-        formattedPhone = `55${contactPhone}`;
-      }
-      
-      const finalFormattedPhone = formattedPhone.startsWith('+') ? formattedPhone : `+${formattedPhone}`;
-      const displayPhone = finalFormattedPhone;
-      
-      // Create contact card with WhatsApp link information
-      const vcard = `BEGIN:VCARD
-VERSION:3.0
-FN:Contato WhatsApp
-TEL;type=CELL;waid=${formattedPhone}:${finalFormattedPhone}
-URL:${whatsappLink}
-END:VCARD`;
-      
-      try {
-        // Use Baileys-compatible contact format
-        await whatsappService.sendMessage(phone, {
-          contacts: {
-            displayName: 'Contato WhatsApp',
-            contacts: [{
-              vcard: vcard
-            }]
-          }
-        });
-        
-        console.log(`📇 WhatsApp link sent as contact card: ${whatsappLink}`);
-        
-        // Save to conversation for external notification processing
-        await conversationService.addMessage(phone, {
-          role: 'assistant',
-          content: `Cartão de contato WhatsApp enviado: ${whatsappLink}`,
-          timestamp: Date.now(),
-          messageType: 'whatsapp_link_card',
-          originalLink: whatsappLink // Keep original link for external notifications
-        });
-        
-      } catch (contactError) {
-        console.log('⚠️ Contact card failed, sending as formatted text with link:', contactError.message);
-        
-        // Fallback: Send as formatted text with clickable link
-        const cardText = `📱 *Contato WhatsApp*
-
-👤 Telefone: ${displayPhone}
-🔗 Link: ${whatsappLink}
-
-_Clique no link para iniciar conversa diretamente_`;
-
-        await whatsappService.sendMessage(phone, { text: cardText });
-        
-        // Save to conversation for external notification processing
-        await conversationService.addMessage(phone, {
-          role: 'assistant',
-          content: cardText,
-          timestamp: Date.now(),
-          messageType: 'whatsapp_link_text',
-          originalLink: whatsappLink // Keep original link for external notifications
-        });
-      }
-      
-    } catch (error) {
-      console.error('Error sending WhatsApp link as card:', error);
-    }
-  }
+  // Contact cards have been removed - now we send everything as simple text messages
+  // This simplifies the system and ensures better compatibility
 
   splitResponseParts(text) {
     // Split by punctuation marks while preserving them
@@ -1282,24 +1165,47 @@ _Clique no link para iniciar conversa diretamente_`;
         return content;
       }
       
-      // Validação avançada: verificar se a resposta está alinhada com o prompt
-      const validationPrompt = `Analise se a resposta abaixo está seguindo as regras definidas:
+      // Validação avançada: verificar se a resposta está alinhada com o prompt E o contexto da conversa
+      const recentContext = messages.slice(-5).map(m => {
+        const msgContent = m.content?.substring(0, 100) || '[mensagem vazia]';
+        const msgType = m.type ? ` [${m.type}]` : '';
+        return `${m.role}: ${msgContent}${msgType}...`;
+      }).join('\n');
+      
+      // Check if last user message was media (sticker, gif, emoji)
+      const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+      const isMediaResponse = lastUserMessage?.type && ['sticker', 'gif'].includes(lastUserMessage.type) ||
+                             (lastUserMessage?.content && /^[\p{Emoji}\s]+$/u.test(lastUserMessage.content));
+      
+      const validationPrompt = `Analise se a resposta abaixo está seguindo as regras definidas CONSIDERANDO o contexto da conversa em andamento:
 
 PROMPT ORIGINAL: "${systemPrompt.substring(0, 500)}..."
 
+CONTEXTO RECENTE DA CONVERSA:
+${recentContext}
+
 RESPOSTA PARA VALIDAR: "${content}"
+
+${isMediaResponse ? 'NOTA ESPECIAL: A mensagem anterior foi mídia (figurinha, GIF) ou emoji - respostas casuais são apropriadas.' : ''}
 
 REGRAS A VERIFICAR:
 1. A resposta está alinhada com a personalidade/papel definido?
 2. A resposta não inventa informações não fornecidas?
-3. A resposta é apropriada para o contexto?
-4. A resposta mantém o foco no tópico?
+3. A resposta é apropriada para o contexto DA CONVERSA ATUAL (não força reapresentação se já se apresentou)?
+4. A resposta mantém continuidade natural com a conversa em andamento?
+5. A resposta não repete informações já fornecidas recentemente?
+6. ${isMediaResponse ? 'ESPECIAL: Para respostas a mídia/emoji, respostas breves e casuais são perfeitamente adequadas.' : 'A resposta tem comprimento adequado para o tipo de interação.'}
+
+IMPORTANTE: 
+- Se a IA já se identificou e forneceu informações na conversa, ela NÃO deve se reapresentar novamente.
+- Respostas a figurinhas, GIFs ou emojis podem ser casuais e breves.
+- Não force formalidade excessiva em respostas a mídia.
 
 Responda apenas:
-- "APROVADA" se a resposta segue todas as regras
+- "APROVADA" se a resposta segue todas as regras e o contexto
 - "CORRIGIR: [explicação breve]" se precisa ajustes
 
-Seja rigoroso na avaliação.`;
+Seja rigoroso mas considere o fluxo natural da conversa e o tipo de mensagem recebida.`;
 
       const validationResponse = await this.openai.chat.completions.create({
         model: 'gpt-5-mini',
@@ -1322,8 +1228,11 @@ Seja rigoroso na avaliação.`;
       if (validationResult.includes('CORRIGIR')) {
         console.log('🔍 Resposta precisa de correção:', validationResult);
         
-        // Tentar corrigir a resposta
-        const correctionPrompt = `Corrija a resposta abaixo para que siga rigorosamente as regras:
+        // Tentar corrigir a resposta considerando o contexto
+        const correctionPrompt = `Corrija a resposta abaixo para que siga rigorosamente as regras CONSIDERANDO o contexto da conversa:
+
+CONTEXTO RECENTE DA CONVERSA:
+${recentContext}
 
 PROMPT ORIGINAL: "${systemPrompt.substring(0, 300)}..."
 RESPOSTA ATUAL: "${content}"
@@ -1333,7 +1242,9 @@ REGRAS OBRIGATÓRIAS:
 - Máximo ${maxLength} caracteres
 - Seguir exatamente a personalidade definida
 - Não inventar informações
-- Manter foco no tópico
+- Manter continuidade natural da conversa
+- NÃO se reapresentar se já se identificou anteriormente
+- Responder de forma natural considerando o que já foi dito
 
 Forneça apenas a resposta corrigida, sem explicações:`;
 

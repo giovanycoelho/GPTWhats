@@ -23,7 +23,12 @@
       "Bash(npm start)",
       "Bash(dir node_modules.binelectron*)",
       "Bash(\"./node_modules/.bin/electron.cmd\" .)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(grep:*)",
+      "Bash(npm test)",
+      "Bash(del test_phone_formatting.js)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:baileys.wiki)"
     ],
     "deny": [],
     "ask": []

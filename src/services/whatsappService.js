@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import pendingMessagesService from './pendingMessagesService.js';
+import configService from './configService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,76 @@ class WhatsAppService {
     this.onlineStatus = false;
     this.messageHandlers = [];
     this.processedCalls = new Set(); // Track processed calls to avoid duplicates
+    this.wasAutoConnecting = false; // Track auto-connection attempts
+    this.persistentConnection = true; // WhatsApp should stay connected regardless of frontend
+    
+    // Online time tracking
+    this.connectionStartTime = null;
+    this.onlineTimeInterval = null;
+    
+    // Reconnection control
+    this.lastDisconnectTime = null;
+    this.consecutiveFailures = 0;
+  }
+
+  // Safe emit function that doesn't break WhatsApp connection
+  safeEmit(event, data) {
+    try {
+      if (global.io && global.io.sockets.sockets.size > 0) {
+        global.io.emit(event, data);
+      }
+    } catch (error) {
+      // Log but don't throw - frontend disconnection should not affect WhatsApp
+      console.log('Frontend emit failed (this is normal during page refresh):', error.message);
+    }
+  }
+
+  // Sync WhatsApp state with newly connected frontend clients
+  syncStateWithFrontend() {
+    if (!global.io || global.io.sockets.sockets.size === 0) return;
+    
+    console.log('🔄 Syncing WhatsApp state with frontend...');
+    
+    // Send current connection status
+    this.safeEmit('connection-status', { 
+      status: this.connectionState 
+    });
+    
+    // Send QR code if available
+    if (this.qr) {
+      this.safeEmit('qr-code', this.qr);
+    }
+    
+    console.log(`📊 State synced: ${this.connectionState}`);
+  }
+
+  async hasValidSession() {
+    try {
+      await fs.mkdir(this.sessionPath, { recursive: true });
+      
+      // Check if creds.json exists (main session file)
+      const credsPath = path.join(this.sessionPath, 'creds.json');
+      await fs.access(credsPath);
+      
+      // Check if the file is not empty and has valid content
+      const credsContent = await fs.readFile(credsPath, 'utf8');
+      const creds = JSON.parse(credsContent);
+      
+      // Check if essential fields exist
+      return creds && 
+             creds.noiseKey && 
+             creds.signedIdentityKey && 
+             creds.signedPreKey && 
+             creds.registrationId;
+    } catch (error) {
+      // Any error means no valid session
+      return false;
+    }
+  }
+
+  async initializeWithAutoConnect() {
+    this.wasAutoConnecting = true;
+    return this.initialize();
   }
 
   async initialize() {
@@ -99,7 +170,7 @@ class WhatsAppService {
       this.qr = qr;
       try {
         const qrString = await qrcode.toDataURL(qr);
-        global.io?.emit('qr-code', qrString);
+        this.safeEmit('qr-code', qrString);
         console.log('📱 QR Code generated');
       } catch (error) {
         console.error('Error generating QR code:', error);
@@ -141,29 +212,58 @@ class WhatsAppService {
       this.onlineStatus = false;
       this.qr = null;
       
-      global.io?.emit('connection-status', { 
+      // Stop online time tracking
+      this.stopOnlineTimeTracking();
+      
+      // Update database connection status
+      await configService.set('whatsapp_connected', 'false');
+      
+      this.safeEmit('connection-status', { 
         status: 'disconnected',
         canReconnect: shouldReconnect 
       });
 
+      // Record disconnect time and failures
+      this.lastDisconnectTime = Date.now();
+      
       if (shouldReconnect && this.retryAttempts < this.maxRetries) {
         this.retryAttempts++;
-        console.log(`🔄 Reconnection attempt ${this.retryAttempts}/${this.maxRetries} in 5 seconds...`);
-        setTimeout(() => this.connect(), 5000);
+        this.consecutiveFailures++;
+        
+        // Exponential backoff: 5s, 10s, 20s, 40s, 80s
+        const backoffTime = Math.min(5000 * Math.pow(2, this.consecutiveFailures - 1), 80000);
+        
+        console.log(`🔄 Reconnection attempt ${this.retryAttempts}/${this.maxRetries} in ${backoffTime/1000}s (failure #${this.consecutiveFailures})`);
+        setTimeout(() => this.connect(), backoffTime);
       } else if (!shouldReconnect) {
         console.log('🛑 Connection terminated - manual reconnection required');
         this.retryAttempts = 0;
+        this.consecutiveFailures = 0;
       } else {
-        console.log('❌ Max retry attempts reached');
+        console.log('❌ Max retry attempts reached - clearing session and waiting for manual reconnection');
+        this.consecutiveFailures = 0;
         await this.clearSession();
       }
     } else if (connection === 'open') {
       console.log('✅ WhatsApp connected successfully');
       this.connectionState = 'connected';
       this.retryAttempts = 0;
+      this.consecutiveFailures = 0; // Reset failure counter on successful connection
       this.qr = null;
       
-      global.io?.emit('connection-status', { 
+      // Start online time tracking
+      this.startOnlineTimeTracking();
+      
+      // Update database connection status
+      await configService.set('whatsapp_connected', 'true');
+      
+      // Notify about successful auto-reconnection
+      if (this.wasAutoConnecting) {
+        console.log('🎉 Auto-reconnection successful!');
+        this.wasAutoConnecting = false;
+      }
+      
+      this.safeEmit('connection-status', { 
         status: 'connected' 
       });
 
@@ -176,10 +276,13 @@ class WhatsAppService {
       // Import and use smart recovery service
       const smartRecoveryService = (await import('./smartRecoveryService.js')).default;
       await smartRecoveryService.onWhatsAppConnected();
+      
+      // Ensure message handler is set up for AI processing
+      await this.ensureMessageHandlerSetup();
     } else if (connection === 'connecting') {
       console.log('🔄 Connecting to WhatsApp...');
       this.connectionState = 'connecting';
-      global.io?.emit('connection-status', { 
+      this.safeEmit('connection-status', { 
         status: 'connecting' 
       });
     }
@@ -189,13 +292,22 @@ class WhatsAppService {
     const message = m.messages[0];
     if (!message || message.key.fromMe) return;
 
+    console.log('📝 Message received from:', message.key.remoteJid);
+
     try {
-      // Emit received message to frontend
-      global.io?.emit('message-received', {
+      this.safeEmit('message-received', {
         from: message.key.remoteJid,
         message: message.message,
         timestamp: message.messageTimestamp
       });
+
+      // Update metrics for received message
+      try {
+        const { updateMetric } = await import('../controllers/dashboardController.js');
+        await updateMetric('message_received', 1);
+      } catch (metricsError) {
+        console.error('Error updating message received metrics:', metricsError);
+      }
 
       // Process message through handlers
       for (const handler of this.messageHandlers) {
@@ -273,6 +385,14 @@ class WhatsAppService {
       await this.setOnlineStatus();
 
       const result = await this.sock.sendMessage(to, message);
+      
+      // Update metrics for sent message
+      try {
+        const { updateMetric } = await import('../controllers/dashboardController.js');
+        await updateMetric('message_sent', 1);
+      } catch (metricsError) {
+        console.error('Error updating message sent metrics:', metricsError);
+      }
       
       // Set offline status after sending
       setTimeout(async () => {
@@ -378,9 +498,8 @@ class WhatsAppService {
       this.retryAttempts = 0;
       this.onlineStatus = false;
       
-      // Notify frontend
-      global.io?.emit('session-cleared');
-      global.io?.emit('connection-status', { 
+      this.safeEmit('session-cleared');
+      this.safeEmit('connection-status', { 
         status: 'disconnected',
         canReconnect: true 
       });
@@ -415,6 +534,87 @@ class WhatsAppService {
       this.sock = null;
       this.connectionState = 'disconnected';
       this.onlineStatus = false;
+      this.stopOnlineTimeTracking();
+      
+      // Update database connection status
+      await configService.set('whatsapp_connected', 'false');
+    }
+  }
+
+  // Online time tracking functions
+  startOnlineTimeTracking() {
+    this.connectionStartTime = new Date();
+    
+    // Update online time every 30 seconds
+    this.onlineTimeInterval = setInterval(async () => {
+      await this.updateOnlineTime();
+    }, 30000);
+    
+    console.log('⏱️ Started online time tracking');
+  }
+
+  stopOnlineTimeTracking() {
+    if (this.onlineTimeInterval) {
+      clearInterval(this.onlineTimeInterval);
+      this.onlineTimeInterval = null;
+    }
+    
+    // Update final online time before stopping
+    if (this.connectionStartTime) {
+      this.updateOnlineTime();
+      this.connectionStartTime = null;
+    }
+    
+    console.log('⏱️ Stopped online time tracking');
+  }
+
+  async updateOnlineTime() {
+    if (!this.connectionStartTime) return;
+    
+    try {
+      const now = new Date();
+      const onlineTimeSeconds = Math.floor((now - this.connectionStartTime) / 1000);
+      
+      if (onlineTimeSeconds > 0) {
+        const { updateMetric } = await import('../controllers/dashboardController.js');
+        await updateMetric('online_time', onlineTimeSeconds);
+        
+        // Reset start time for next interval
+        this.connectionStartTime = now;
+      }
+    } catch (error) {
+      console.error('Error updating online time metrics:', error);
+    }
+  }
+
+  async ensureMessageHandlerSetup() {
+    try {
+      // Import the handler function from whatsappController
+      const whatsappController = await import('../controllers/whatsappController.js');
+      
+      // Check if we already have a handler (avoid duplicates)
+      if (this.messageHandlers.length === 0) {
+        console.log('🔧 Setting up message handler for AI processing');
+        
+        // Add the message handler
+        this.addMessageHandler(async (message) => {
+          try {
+            // Call the handleIncomingMessage function directly
+            const { handleIncomingMessage } = whatsappController;
+            if (handleIncomingMessage) {
+              await handleIncomingMessage(message);
+            }
+          } catch (error) {
+            console.error('Error in message handler:', error);
+          }
+        });
+        
+        console.log(`✅ Message handler added. Total handlers: ${this.messageHandlers.length}`);
+      } else {
+        console.log(`📋 Message handler already exists. Total handlers: ${this.messageHandlers.length}`);
+      }
+    } catch (error) {
+      console.error('Error setting up message handler:', error);
     }
   }
 }

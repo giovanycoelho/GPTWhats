@@ -52,6 +52,14 @@ class ConversationService {
           lastActivity: new Date().toISOString(),
           createdAt: new Date().toISOString()
         };
+        
+        // Update metrics for new conversation
+        try {
+          const { updateMetric } = await import('../controllers/dashboardController.js');
+          await updateMetric('conversation_started', 1);
+        } catch (metricsError) {
+          console.error('Error updating conversation started metrics:', metricsError);
+        }
       }
 
       // Check if this is a user message and conversation was inactive

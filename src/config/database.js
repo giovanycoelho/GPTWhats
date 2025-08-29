@@ -101,7 +101,7 @@ export const initializeDatabase = async () => {
     // Dashboard metrics table
     `CREATE TABLE IF NOT EXISTS metrics (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      date DATE NOT NULL,
+      date DATE NOT NULL UNIQUE,
       messages_sent INTEGER DEFAULT 0,
       messages_received INTEGER DEFAULT 0,
       conversations_started INTEGER DEFAULT 0,
@@ -252,7 +252,7 @@ export const initializeDatabase = async () => {
   try {
     await db.run(
       `INSERT OR IGNORE INTO external_notifications (id, enabled, whatsapp_links_enabled, custom_rules_enabled) 
-       VALUES (1, FALSE, FALSE, FALSE)`
+       VALUES (1, TRUE, TRUE, FALSE)`
     );
   } catch (error) {
     console.error('Error initializing external notifications:', error);

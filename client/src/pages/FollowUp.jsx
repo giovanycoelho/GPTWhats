@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Save, Clock, MessageCircle, TrendingUp, CheckCircle, AlertCircle, Play, Pause, BarChart3, History } from 'lucide-react'
+import { 
+  Save, Clock, MessageCircle, TrendingUp, CheckCircle, AlertCircle, 
+  Play, Pause, BarChart3, History, Zap, Brain, Shield, Target,
+  Timer, Settings, Users, MessageSquare, Activity, Sparkles
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const FollowUp = () => {
@@ -90,157 +94,340 @@ const FollowUp = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Follow-up Inteligente</h1>
-          <p className="text-gray-400">
-            Configure mensagens automáticas de follow-up baseadas em análise de IA
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${settings.enabled ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-            <span className="text-sm text-gray-400">
-              {settings.enabled ? 'Ativo' : 'Inativo'}
-            </span>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6 }}
+      className="space-y-8"
+    >
+      {/* Header Modernizado */}
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="relative"
+      >
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 rounded-2xl blur-3xl" />
+        
+        <div className="relative flex items-center justify-between p-6 card-glass border border-white/10">
+          <div className="flex items-center space-x-6">
+            <motion.div 
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              className="p-4 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-2xl shadow-lg"
+            >
+              <Brain className="w-8 h-8 text-white" />
+            </motion.div>
+            
+            <div>
+              <motion.h1 
+                className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2"
+                animate={{ backgroundPosition: ['0%', '100%'] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              >
+                Follow-up Inteligente
+              </motion.h1>
+              <div className="flex items-center space-x-3 text-gray-400">
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <p>Sistema avançado de follow-up baseado em análise de IA</p>
+              </div>
+            </div>
           </div>
-          
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <Save className="w-4 h-4" />
-            <span>{saving ? 'Salvando...' : 'Salvar Configurações'}</span>
-          </button>
+
+          <div className="flex items-center space-x-6">
+            {/* Status Badge */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl ${
+                settings.enabled 
+                  ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30' 
+                  : 'bg-gradient-to-r from-gray-500/20 to-slate-500/20 border border-gray-500/30'
+              }`}
+            >
+              <motion.div 
+                animate={settings.enabled ? { scale: [1, 1.2, 1] } : {}}
+                transition={{ duration: 2, repeat: Infinity }}
+                className={`w-3 h-3 rounded-full ${settings.enabled ? 'bg-green-400 shadow-green-400/50 shadow-lg' : 'bg-gray-500'}`}
+              />
+              <div className="text-center">
+                <div className={`text-sm font-semibold ${settings.enabled ? 'text-green-400' : 'text-gray-400'}`}>
+                  {settings.enabled ? 'ATIVO' : 'INATIVO'}
+                </div>
+                <div className="text-xs text-gray-500">Sistema</div>
+              </div>
+            </motion.div>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700"
+            >
+              {saving ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+              <span className="font-medium">
+                {saving ? 'Salvando...' : 'Salvar Configurações'}
+              </span>
+            </motion.button>
+          </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Status Cards */}
+      {/* Status Cards Modernizados */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Na Fila</p>
-                <p className="text-2xl font-bold text-white">{stats.queue?.pending || 0}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {[
+            {
+              title: 'Na Fila',
+              value: stats.queue?.pending || 0,
+              icon: Timer,
+              gradient: 'from-blue-500 to-cyan-600',
+              bgGradient: 'from-blue-500/10 to-cyan-500/10',
+              description: 'Aguardando processamento',
+              delay: 0
+            },
+            {
+              title: 'Enviados (30d)',
+              value: stats.history?.total_sent || 0,
+              icon: MessageSquare,
+              gradient: 'from-green-500 to-emerald-600',
+              bgGradient: 'from-green-500/10 to-emerald-500/10',
+              description: 'Follow-ups enviados',
+              delay: 0.1
+            },
+            {
+              title: 'Taxa de Resposta',
+              value: `${stats.history?.total_sent > 0 
+                ? Math.round((stats.history.responses / stats.history.total_sent) * 100) 
+                : 0}%`,
+              icon: TrendingUp,
+              gradient: 'from-purple-500 to-pink-600',
+              bgGradient: 'from-purple-500/10 to-pink-500/10',
+              description: 'Clientes que responderam',
+              delay: 0.2
+            },
+            {
+              title: 'Processados',
+              value: stats.queue?.completed || 0,
+              icon: CheckCircle,
+              gradient: 'from-orange-500 to-red-600',
+              bgGradient: 'from-orange-500/10 to-red-500/10',
+              description: 'Análises concluídas',
+              delay: 0.3
+            }
+          ].map((stat, index) => (
+            <motion.div
+              key={stat.title}
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 + stat.delay }}
+              whileHover={{ y: -5, scale: 1.02 }}
+              className={`card-glass relative overflow-hidden p-6 bg-gradient-to-br ${stat.bgGradient} border border-white/10 cursor-pointer group`}
+            >
+              {/* Background pattern */}
+              <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
+                <motion.div 
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className={`w-full h-full bg-gradient-to-br ${stat.gradient} rounded-full transform rotate-12 translate-x-8 -translate-y-8`}
+                />
               </div>
-              <Clock className="w-8 h-8 text-blue-500" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass-card p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Enviados (30d)</p>
-                <p className="text-2xl font-bold text-white">{stats.history?.total_sent || 0}</p>
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <motion.div 
+                    whileHover={{ scale: 1.1, rotate: 10 }}
+                    className={`p-3 rounded-xl bg-gradient-to-r ${stat.gradient} shadow-lg`}
+                  >
+                    <stat.icon className="w-6 h-6 text-white" />
+                  </motion.div>
+                  
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: index * 0.5 }}
+                    className="w-2 h-2 bg-gradient-to-r from-white to-gray-300 rounded-full opacity-70"
+                  />
+                </div>
+                
+                <div>
+                  <p className="text-gray-400 text-sm font-medium mb-2 group-hover:text-gray-300 transition-colors">
+                    {stat.title}
+                  </p>
+                  <motion.p 
+                    key={stat.value}
+                    initial={{ scale: 1.2 }}
+                    animate={{ scale: 1 }}
+                    className="text-3xl font-bold text-white mb-2 group-hover:text-white/90 transition-colors"
+                  >
+                    {stat.value}
+                  </motion.p>
+                  <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">
+                    {stat.description}
+                  </p>
+                </div>
               </div>
-              <MessageCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-card p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Taxa de Resposta</p>
-                <p className="text-2xl font-bold text-white">
-                  {stats.history?.total_sent > 0 
-                    ? Math.round((stats.history.responses / stats.history.total_sent) * 100) 
-                    : 0}%
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-purple-500" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="glass-card p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Processados</p>
-                <p className="text-2xl font-bold text-white">{stats.queue?.completed || 0}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-primary-500" />
-            </div>
-          </motion.div>
+              
+              {/* Hover effect border */}
+              <motion.div
+                className="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-primary-500/30 transition-colors duration-300"
+                whileHover={{ 
+                  boxShadow: `0 0 30px ${index % 4 === 0 ? 'rgba(59, 130, 246, 0.3)' : 
+                                       index % 4 === 1 ? 'rgba(34, 197, 94, 0.3)' :
+                                       index % 4 === 2 ? 'rgba(168, 85, 247, 0.3)' : 'rgba(249, 115, 22, 0.3)'}`
+                }}
+              />
+            </motion.div>
+          ))}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-white/5 rounded-lg p-1">
-        {[
-          { key: 'settings', label: 'Configurações', icon: AlertCircle },
-          { key: 'stats', label: 'Estatísticas', icon: BarChart3 }
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`
-              flex items-center space-x-2 px-4 py-2 rounded-md transition-all duration-200
-              ${activeTab === tab.key 
-                ? 'bg-primary-600 text-white' 
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }
-            `}
-          >
-            <tab.icon className="w-4 h-4" />
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Tabs Modernizados */}
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="relative"
+      >
+        <div className="flex space-x-2 bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-xl p-2 backdrop-blur-sm border border-white/10">
+          {[
+            { key: 'settings', label: 'Configurações', icon: Settings, gradient: 'from-cyan-500 to-blue-600' },
+            { key: 'stats', label: 'Estatísticas', icon: BarChart3, gradient: 'from-purple-500 to-pink-600' }
+          ].map((tab) => (
+            <motion.button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`
+                relative flex items-center space-x-3 px-6 py-3 rounded-lg transition-all duration-300 font-medium
+                ${activeTab === tab.key 
+                  ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg shadow-primary-500/25` 
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }
+              `}
+            >
+              {activeTab === tab.key && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-lg"
+                  initial={false}
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+              
+              <motion.div
+                whileHover={{ rotate: 5 }}
+                className="relative z-10"
+              >
+                <tab.icon className="w-5 h-5" />
+              </motion.div>
+              <span className="relative z-10">{tab.label}</span>
+              
+              {activeTab === tab.key && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="w-2 h-2 bg-white rounded-full ml-auto"
+                />
+              )}
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <div className="space-y-6">
-          {/* Enable/Disable */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-8"
+        >
+          {/* Enable/Disable Modernizado */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-card p-6"
+            whileHover={{ scale: 1.01 }}
+            className="card-glass relative overflow-hidden p-8 bg-gradient-to-br from-green-500/5 to-emerald-500/5 border border-green-500/20"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Status do Follow-up</h3>
-                <p className="text-gray-400 text-sm">
-                  Ativar ou desativar o sistema de follow-up automático
-                </p>
+            {/* Background pattern */}
+            <div className="absolute top-0 right-0 w-40 h-40 opacity-5">
+              <div className="w-full h-full bg-gradient-to-br from-green-500 to-emerald-600 rounded-full transform rotate-45 translate-x-10 -translate-y-10" />
+            </div>
+            
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <motion.div
+                  whileHover={{ scale: 1.1, rotate: 10 }}
+                  className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg"
+                >
+                  <Activity className="w-7 h-7 text-white" />
+                </motion.div>
+                
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-2 flex items-center space-x-2">
+                    <span>Status do Follow-up</span>
+                    {settings.enabled && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30"
+                      >
+                        ATIVO
+                      </motion.div>
+                    )}
+                  </h3>
+                  <p className="text-gray-400">
+                    {settings.enabled 
+                      ? 'Sistema funcionando e processando conversas automaticamente' 
+                      : 'Sistema pausado - nenhum follow-up será enviado'
+                    }
+                  </p>
+                </div>
               </div>
               
-              <button
+              <motion.button
                 onClick={handleToggleEnabled}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className={`
-                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200
-                  ${settings.enabled ? 'bg-primary-600' : 'bg-gray-600'}
+                  relative inline-flex h-8 w-16 items-center rounded-full transition-all duration-300 shadow-lg
+                  ${settings.enabled 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 shadow-green-500/30' 
+                    : 'bg-gradient-to-r from-gray-600 to-gray-700 shadow-gray-500/30'
+                  }
                 `}
               >
-                <span
-                  className={`
-                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200
-                    ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}
-                  `}
+                <motion.span
+                  animate={{
+                    x: settings.enabled ? 32 : 4,
+                    backgroundColor: settings.enabled ? '#ffffff' : '#d1d5db'
+                  }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="inline-block h-6 w-6 transform rounded-full shadow-lg"
                 />
-              </button>
+                
+                {/* Icons inside toggle */}
+                <motion.div
+                  animate={{ opacity: settings.enabled ? 1 : 0 }}
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2"
+                >
+                  <CheckCircle className="w-4 h-4 text-white" />
+                </motion.div>
+                <motion.div
+                  animate={{ opacity: settings.enabled ? 0 : 1 }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                >
+                  <Pause className="w-4 h-4 text-gray-400" />
+                </motion.div>
+              </motion.button>
             </div>
           </motion.div>
 
@@ -507,7 +694,7 @@ const FollowUp = () => {
               </div>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
 
       {/* Stats Tab */}
@@ -531,7 +718,7 @@ const FollowUp = () => {
           </div>
         </motion.div>
       )}
-    </div>
+    </motion.div>
   )
 }
 

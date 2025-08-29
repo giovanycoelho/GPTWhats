@@ -39,14 +39,21 @@ class ExternalNotificationsService {
       const settings = await this.getSettings();
       
       if (!settings.enabled || !settings.whatsapp_links_enabled) {
+        console.log('🚫 WhatsApp link notifications disabled in settings');
         return;
       }
 
       const whatsappLinks = new Set(); // Use Set to avoid duplicates
       
+      console.log(`🔍 Searching for WhatsApp links in response: "${response?.substring(0, 100)}..."`);
+      
       // Method 1: Check response text for WhatsApp links (backward compatibility)
       const whatsappLinkRegex = /(https:\/\/wa\.me\/[^\s]+)/g;
       const responseMatches = response.match(whatsappLinkRegex);
+      
+      if (responseMatches) {
+        console.log(`✅ Found ${responseMatches.length} WhatsApp links in response:`, responseMatches);
+      }
       
       if (responseMatches && responseMatches.length > 0) {
         responseMatches.forEach(link => whatsappLinks.add(link));
@@ -55,38 +62,52 @@ class ExternalNotificationsService {
       // Method 2: Check recent conversation messages for WhatsApp link cards/texts
       if (conversation && conversation.messages) {
         const recentMessages = conversation.messages.slice(-3); // Check last 3 messages
+        console.log(`🔍 Checking ${recentMessages.length} recent conversation messages for WhatsApp links`);
         
         for (const message of recentMessages) {
-          // Check for messages marked as WhatsApp link cards or texts
-          if (message.role === 'assistant' && 
-              (message.messageType === 'whatsapp_link_card' || message.messageType === 'whatsapp_link_text') && 
-              message.originalLink) {
-            whatsappLinks.add(message.originalLink);
+          // Check for messages marked as WhatsApp links (new simplified system)
+          if (message.role === 'assistant' && message.messageType === 'whatsapp_links') {
+            console.log(`🎯 Found WhatsApp links in conversation with messageType: ${message.messageType}`);
+            // Extract links from the text content since we now send them as simple text
+            const linkMatches = message.content?.match(/https:\/\/wa\.me\/\d+/g);
+            if (linkMatches) {
+              linkMatches.forEach(link => whatsappLinks.add(link));
+            }
           }
           
           // Also check message content for links (fallback)
           if (message.content) {
             const contentMatches = message.content.match(whatsappLinkRegex);
             if (contentMatches) {
+              console.log(`🎯 Found WhatsApp links in message content:`, contentMatches);
               contentMatches.forEach(link => whatsappLinks.add(link));
             }
           }
         }
+      } else {
+        console.log('⚠️ No conversation data available for link detection');
       }
       
       // Process all found WhatsApp links
       if (whatsappLinks.size > 0) {
+        console.log(`📨 Processing ${whatsappLinks.size} unique WhatsApp links for notification`);
+        
         for (const fullLink of whatsappLinks) {
           // Extract just the phone number from the link for identification
           const phoneMatch = fullLink.match(/https:\/\/wa\.me\/(\d+)/);
           if (phoneMatch) {
             const phoneForId = phoneMatch[1];
+            console.log(`📤 Sending WhatsApp link notification to: ${phoneForId} for link: ${fullLink}`);
             await this.sendWhatsAppLinkNotification(sourcePhone, phoneForId, clientName, response, fullLink);
+          } else {
+            console.log(`❌ Invalid WhatsApp link format: ${fullLink}`);
           }
         }
+      } else {
+        console.log('ℹ️ No WhatsApp links found - no external notifications to send');
       }
     } catch (error) {
-      console.error('Error checking WhatsApp link notification:', error);
+      console.error('❌ Error checking WhatsApp link notification:', error);
     }
   }
 
@@ -274,23 +295,29 @@ _Notificação gerada automaticamente pelo GPTWhats_`;
     try {
       // Try multiple notification methods in order of preference
       
-      // Method 1: Try to send via WhatsApp API if the phone exists in contacts
+      // Method 1: Try to send via WhatsApp API (attempt direct send even without existing contact)
       try {
         const whatsappService = await import('./whatsappService.js');
         const contactsService = await import('./contactsService.js');
         
-        // Check if we have this contact in our database (meaning it's been active)
+        // First, check if we have this contact in our database
         const existingContact = await contactsService.default.getContact(`${phoneForId}@s.whatsapp.net`);
         
         if (existingContact) {
           console.log(`📞 Sending notification via WhatsApp API to known contact: ${phoneForId}`);
-          await whatsappService.default.sendMessage(`${phoneForId}@s.whatsapp.net`, {
-            text: notificationMessage
-          });
-          return true;
+        } else {
+          console.log(`📞 Attempting to send notification via WhatsApp API to new contact: ${phoneForId}`);
         }
+        
+        await whatsappService.default.sendMessage(`${phoneForId}@s.whatsapp.net`, {
+          text: notificationMessage
+        });
+        
+        console.log(`✅ Notification sent successfully via WhatsApp to ${phoneForId}`);
+        return true;
+        
       } catch (whatsappError) {
-        console.log(`⚠️ WhatsApp API failed for ${phoneForId}, trying alternatives...`);
+        console.log(`⚠️ WhatsApp API failed for ${phoneForId}:`, whatsappError.message);
       }
       
       // Method 2: Use webhook if configured
@@ -368,13 +395,34 @@ _Notificação gerada automaticamente pelo GPTWhats_`;
     // Run in background without awaiting
     setImmediate(async () => {
       try {
+        console.log(`🔔 Processing external notifications for ${clientName} (${sourcePhone})`);
+        
+        // Get settings first for debugging
+        const settings = await this.getSettings();
+        console.log('📋 External notification settings:', settings);
+        
+        if (!settings.enabled) {
+          console.log('⚠️ External notifications are disabled in settings');
+          return;
+        }
+        
         // Check WhatsApp link notifications (now includes conversation context)
-        await this.checkWhatsAppLinkNotification(response, sourcePhone, clientName, conversation);
+        if (settings.whatsapp_links_enabled) {
+          console.log('🔗 Checking WhatsApp link notifications...');
+          await this.checkWhatsAppLinkNotification(response, sourcePhone, clientName, conversation);
+        } else {
+          console.log('⚠️ WhatsApp link notifications are disabled');
+        }
         
         // Check custom rule notifications
-        await this.checkCustomRuleNotifications(response, conversation, sourcePhone, clientName);
+        if (settings.custom_rules_enabled) {
+          console.log('📝 Checking custom rule notifications...');
+          await this.checkCustomRuleNotifications(response, conversation, sourcePhone, clientName);
+        } else {
+          console.log('⚠️ Custom rule notifications are disabled');
+        }
       } catch (error) {
-        console.error('Error processing notifications asynchronously:', error);
+        console.error('❌ Error processing notifications asynchronously:', error);
       }
     });
   }
